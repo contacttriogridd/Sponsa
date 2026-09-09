@@ -1,0 +1,9 @@
+'use client';
+import { useEffect,useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { Calendar, type CalendarEvent } from '@/components/calendar/CalendarView';
+import { supabase } from '@/lib/supabase/client';
+import type { Donation, SpecialOccasion, Sponsor } from '@/lib/types';
+import { getUpcomingOccasions } from '@/lib/date-utils';
+export default function CalendarPage(){const router=useRouter();const [events,setEvents]=useState<CalendarEvent[]>([]);useEffect(()=>{(async()=>{const [o,s,d]=await Promise.all([supabase.from('special_occasions').select('*'),supabase.from('sponsors').select('*'),supabase.from('donations').select('*')]);const sponsors=(s.data||[]) as Sponsor[];const upcoming=getUpcomingOccasions((o.data||[]) as SpecialOccasion[],sponsors,365);const occasionEvents:CalendarEvent[]=upcoming.map(x=>({date:`${x.nextDate.getFullYear()}-${String(x.nextDate.getMonth()+1).padStart(2,'0')}-${String(x.nextDate.getDate()).padStart(2,'0')}`,title:x.occasion.person_name,type:x.occasion.occasion_type.includes('Anniversary')?'anniversary':'birthday',sponsorId:x.sponsor.id}));const donationEvents:CalendarEvent[]=((d.data||[]) as Donation[]).map(don=>({date:don.donation_date,title:don.occasion_name||'Donation',type:'donation',sponsorId:don.sponsor_id}));setEvents([...occasionEvents,...donationEvents]);})();},[]);return <AppLayout><div className="space-y-5"><div><p className="text-sm text-muted-foreground">Plan ahead</p><h1 className="text-2xl font-semibold mt-1">Calendar</h1><p className="text-sm text-muted-foreground mt-1">Birthdays, anniversaries, donations, and follow-ups in one view.</p></div><Calendar events={events} onEventClick={(e)=>{if(e.sponsorId) router.push(`/sponsors/${e.sponsorId}`);}}/></div></AppLayout>}
