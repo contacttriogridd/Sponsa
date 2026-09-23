@@ -38,7 +38,7 @@ Your kindness can bring happiness and nourishment to someone who truly needs it.
 Thank you for your support.
 
 Warm regards,
-Sponsa`;
+VP Trust`;
 
   const [form, setForm] = useState({
     occasion_name: request?.occasion_name || occasion?.occasion_type || '',

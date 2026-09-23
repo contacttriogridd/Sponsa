@@ -81,7 +81,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           S
         </div>
         <div>
-          <div className="font-semibold text-sm">Sponsa</div>
+          <div className="font-semibold text-sm">VP Trust</div>
           <div className="text-xs text-muted-foreground">Sponsor Management</div>
         </div>
       </div>

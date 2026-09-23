@@ -6,7 +6,7 @@ import { Providers } from './providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Sponsa | Compassionate Sponsorship Management',
+  title: 'VP Trust | Compassionate Sponsorship Management',
   description: 'Manage sponsors, special occasions, food sponsorships, and donations with clarity.',
 };
 

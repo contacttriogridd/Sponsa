@@ -649,7 +649,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs (user_id);
 -- Default data
 -- ============================================================
 INSERT INTO organization_settings (name, timezone, currency)
-VALUES ('Sponsa', 'Asia/Kolkata', 'INR')
+VALUES ('VP Trust', 'Asia/Kolkata', 'INR')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO message_templates (name, type, body, variables, is_approved) VALUES

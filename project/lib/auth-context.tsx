@@ -124,9 +124,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [fetchAppUser]);
 
+  // "Failed to fetch" means the browser never reached Supabase at all
+  // (wrong/deleted project URL, network or DNS block), not a bad credential.
+  const describeAuthError = (message: string) =>
+    /failed to fetch|network/i.test(message)
+      ? 'Could not reach the authentication server. Check your internet connection and the Supabase URL in .env.'
+      : message;
+
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message || null };
+    return { error: error ? describeAuthError(error.message) : null };
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
@@ -136,7 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       options: { data: { full_name: fullName } },
     });
 
-    if (error) return { error: error.message };
+    if (error) return { error: describeAuthError(error.message) };
 
     // The app_users row is created by fetchAppUser's auto-create path once
     // the SIGNED_IN auth event fires — inserting it here too would race

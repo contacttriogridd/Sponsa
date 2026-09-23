@@ -54,7 +54,7 @@ export default function LoginPage() {
           so it scrolls with the page instead of sitting fixed on top of content that scrolls under it. */}
       <div className="hidden lg:flex fixed top-8 left-8 z-10 items-center gap-3 text-white">
         <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center font-bold text-lg shadow-lg shadow-black/30">S</div>
-        <span className="font-semibold text-lg tracking-tight drop-shadow-sm">Sponsa</span>
+        <span className="font-semibold text-lg tracking-tight drop-shadow-sm">VP Trust</span>
       </div>
 
       {/* Centered content: stacks (brand, story, card) on mobile, sits side-by-side on large screens.
@@ -65,7 +65,7 @@ export default function LoginPage() {
         <div className="w-full lg:max-w-sm text-center lg:text-left text-white">
           <div className="flex lg:hidden items-center justify-center gap-3 text-white mb-5">
             <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center font-bold text-base shadow-lg shadow-black/30">S</div>
-            <span className="font-semibold text-base tracking-tight drop-shadow-sm">Sponsa</span>
+            <span className="font-semibold text-base tracking-tight drop-shadow-sm">VP Trust</span>
           </div>
           <span className="inline-block text-[10px] sm:text-xs font-medium tracking-wide uppercase text-white/80 bg-white/10 backdrop-blur-md border border-white/15 rounded-full px-2.5 py-1 sm:px-3 mb-3 sm:mb-4">Every occasion can create an impact</span>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold leading-tight drop-shadow-sm">Make every <span className="text-primary">kindness count.</span></h1>
@@ -88,7 +88,7 @@ export default function LoginPage() {
               {error && <p className="text-sm text-red-200 bg-red-500/15 border border-red-400/20 rounded-lg px-3 py-2">{error}</p>}
               <Button disabled={busy} className="w-full h-11 shadow-lg shadow-primary/30">{busy ? 'Please wait...' : mode === 'login' ? 'Sign in' : 'Create account'} {!busy && <ArrowRight className="h-4 w-4 ml-2" />}</Button>
             </form>
-            <button onClick={()=>{setMode(mode==='login'?'signup':'login');setError('')}} className="mt-6 text-sm text-white/60 hover:text-white w-full text-center transition-colors">{mode==='login' ? 'New to Sponsa? Create an account' : 'Already have an account? Sign in'}</button>
+            <button onClick={()=>{setMode(mode==='login'?'signup':'login');setError('')}} className="mt-6 text-sm text-white/60 hover:text-white w-full text-center transition-colors">{mode==='login' ? 'New to VP Trust? Create an account' : 'Already have an account? Sign in'}</button>
           </div>
         </div>
       </div>

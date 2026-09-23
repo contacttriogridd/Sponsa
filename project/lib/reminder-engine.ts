@@ -43,7 +43,7 @@ export async function runReminderEngine(currentUserId: string): Promise<{ create
   ]);
 
   const intervals: number[] = org?.reminder_intervals?.length ? org.reminder_intervals : DEFAULT_INTERVALS;
-  const organizationName = org?.name || 'Sponsa';
+  const organizationName = org?.name || 'VP Trust';
   const sponsorMap = new Map((sponsors || []).map((s: Sponsor) => [s.id, s]));
   const templateByType = new Map((templates || []).map((t: MessageTemplate) => [t.type, t]));
   const today = new Date();
