@@ -25,12 +25,16 @@ import { SponsorshipForm } from '@/components/shared/SponsorshipForm';
 import { Timeline } from '@/components/shared/Timeline';
 import type { TimelineEvent } from '@/components/shared/Timeline';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
+import { DeleteSponsorDialog } from '@/components/shared/DeleteSponsorDialog';
+import { useAuth } from '@/lib/auth-context';
 
 type DialogType = 'edit' | 'addFamily' | 'editFamily' | 'addOccasion' | 'editOccasion' | 'addDonation' | 'addSponsorship' | null;
 
 export default function SponsorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { appUser } = useAuth();
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const [sponsor, setSponsor] = useState<Sponsor | null>(null);
   const [family, setFamily] = useState<FamilyMember[]>([]);
@@ -199,6 +203,16 @@ export default function SponsorDetailPage() {
                   : <><RotateCcw className="h-4 w-4 mr-1.5" />Restore</>
                 }
               </Button>
+              {appUser?.role === 'admin' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDeleteOpen(true)}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4 mr-1.5" />Delete
+                </Button>
+              )}
             </div>
           </div>
 
@@ -506,6 +520,11 @@ export default function SponsorDetailPage() {
           </DialogContent>
         </Dialog>
       </div>
+      <DeleteSponsorDialog
+        sponsor={deleteOpen ? sponsor : null}
+        onOpenChange={setDeleteOpen}
+        onDeleted={() => router.push('/sponsors')}
+      />
     </AppLayout>
   );
 }
