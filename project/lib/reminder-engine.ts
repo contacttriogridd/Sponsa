@@ -1,10 +1,7 @@
 import { supabase } from '@/lib/supabase/client';
 import type { MessageTemplate, Sponsor, SpecialOccasion } from '@/lib/types';
-import { getNextOccurrence } from '@/lib/date-utils';
-import { OCCASION_ICONS } from '@/lib/constants';
+import { DEFAULT_INTERVALS, getDueReminders, toDateKey } from '@/lib/due-reminders';
 import { buildMessageFromTemplate, sendWhatsAppMessage } from '@/lib/whatsapp';
-
-const DEFAULT_INTERVALS = [7, 3, 1, 0];
 
 /** Maps an occasion to the approved template type used to wish the sponsor. */
 function templateTypeFor(occasion: SpecialOccasion): string | null {
@@ -15,16 +12,6 @@ function templateTypeFor(occasion: SpecialOccasion): string | null {
     return 'Anniversary Wish';
   }
   return null;
-}
-
-function toDateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function reminderLabel(daysBefore: number): string {
-  if (daysBefore === 0) return 'is today';
-  if (daysBefore === 1) return 'is tomorrow';
-  return `is in ${daysBefore} days`;
 }
 
 /**
@@ -44,61 +31,47 @@ export async function runReminderEngine(currentUserId: string): Promise<{ create
 
   const intervals: number[] = org?.reminder_intervals?.length ? org.reminder_intervals : DEFAULT_INTERVALS;
   const organizationName = org?.name || 'VP Trust';
-  const sponsorMap = new Map((sponsors || []).map((s: Sponsor) => [s.id, s]));
   const templateByType = new Map((templates || []).map((t: MessageTemplate) => [t.type, t]));
-  const today = new Date();
-  const todayKey = toDateKey(today);
+  const todayKey = toDateKey(new Date());
+  const due = getDueReminders((occasions || []) as SpecialOccasion[], (sponsors || []) as Sponsor[], intervals);
 
   let created = 0;
 
-  for (const occasion of (occasions || []) as SpecialOccasion[]) {
-    const sponsor = sponsorMap.get(occasion.sponsor_id);
-    if (!sponsor) continue;
+  for (const { occasion, sponsor, daysBefore, occurrenceYear, title, message } of due) {
+    const { error: insertError } = await supabase.from('reminders').insert({
+      occasion_id: occasion.id,
+      sponsor_id: sponsor.id,
+      reminder_date: todayKey,
+      occurrence_year: occurrenceYear,
+      days_before: daysBefore,
+      status: 'pending',
+    });
 
-    const next = getNextOccurrence(occasion.occasion_date, occasion.recurring_yearly, today);
-    if (!next) continue;
+    if (insertError) continue; // already exists for this occasion/year/interval
 
-    for (const daysBefore of intervals) {
-      const reminderDate = new Date(next.date);
-      reminderDate.setDate(reminderDate.getDate() - daysBefore);
-      if (toDateKey(reminderDate) !== todayKey) continue;
+    created += 1;
+    await supabase.from('notifications').insert({
+      user_id: currentUserId,
+      type: 'occasion_reminder',
+      title,
+      message,
+      sponsor_id: sponsor.id,
+      occasion_id: occasion.id,
+    });
 
-      const { error: insertError } = await supabase.from('reminders').insert({
-        occasion_id: occasion.id,
-        sponsor_id: sponsor.id,
-        reminder_date: todayKey,
-        occurrence_year: next.occurrenceYear,
-        days_before: daysBefore,
-        status: 'pending',
-      });
-
-      if (insertError) continue; // already exists for this occasion/year/interval
-
-      created += 1;
-      const icon = OCCASION_ICONS[occasion.occasion_type] || '⭐';
-      await supabase.from('notifications').insert({
-        user_id: currentUserId,
-        type: 'occasion_reminder',
-        title: `${icon} ${occasion.person_name}'s ${occasion.occasion_type} ${reminderLabel(daysBefore)}`,
-        message: `${sponsor.full_name} — consider reaching out about a food sponsorship.`,
-        sponsor_id: sponsor.id,
-        occasion_id: occasion.id,
-      });
-
-      // On the day itself, send the approved wish automatically if the
-      // sponsor has WhatsApp + consent and the API is configured — falls
-      // back to a draft message otherwise (handled inside sendWhatsAppMessage).
-      if (daysBefore === 0) {
-        const templateType = templateTypeFor(occasion);
-        const template = templateType ? templateByType.get(templateType) : null;
-        if (org?.whatsapp_enabled && template && sponsor.whatsapp && sponsor.whatsapp_consent) {
-          const body = buildMessageFromTemplate(template, {
-            sponsor_name: sponsor.preferred_name || sponsor.full_name,
-            person_name: occasion.person_name,
-            organization_name: organizationName,
-          });
-          await sendWhatsAppMessage(sponsor, body, template.id, currentUserId);
-        }
+    // On the day itself, send the approved wish automatically if the
+    // sponsor has WhatsApp + consent and the API is configured — falls
+    // back to a draft message otherwise (handled inside sendWhatsAppMessage).
+    if (daysBefore === 0) {
+      const templateType = templateTypeFor(occasion);
+      const template = templateType ? templateByType.get(templateType) : null;
+      if (org?.whatsapp_enabled && template && sponsor.whatsapp && sponsor.whatsapp_consent) {
+        const body = buildMessageFromTemplate(template, {
+          sponsor_name: sponsor.preferred_name || sponsor.full_name,
+          person_name: occasion.person_name,
+          organization_name: organizationName,
+        });
+        await sendWhatsAppMessage(sponsor, body, template.id, currentUserId);
       }
     }
   }

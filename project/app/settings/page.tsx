@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Save, MessageCircle, Users, FileText, Settings2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { PushNotificationsCard } from '@/components/shared/PushNotificationsCard';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,6 +77,8 @@ export default function SettingsPage() {
           <h1 className="text-2xl font-semibold mt-1">Settings</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage your organization and application preferences.</p>
         </div>
+
+        <PushNotificationsCard />
 
         <Card className="p-5 space-y-4">
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Organization</h3>
