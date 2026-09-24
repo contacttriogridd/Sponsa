@@ -59,6 +59,23 @@ export const TASK_STATUSES = [
   'Completed',
 ] as const;
 
+export const DONATION_TYPES = [
+  'Food',
+  'Money',
+  'Clothes',
+  'Education',
+  'Medical',
+  'Groceries',
+  'Books & Stationery',
+  'Other',
+] as const;
+
+/** Older records were saved with this type before donations covered more than food. */
+export function normalizeDonationType(type?: string | null): string {
+  if (!type || type === 'Food Sponsorship') return 'Food';
+  return type;
+}
+
 export const FOOD_TYPES = [
   'Breakfast',
   'Lunch',

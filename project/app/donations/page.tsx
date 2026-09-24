@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DonationForm } from '@/components/shared/DonationForm';
 import { supabase } from '@/lib/supabase/client';
-import { formatCurrency, formatDate } from '@/lib/constants';
+import { formatCurrency, formatDate, normalizeDonationType } from '@/lib/constants';
 import type { Sponsor } from '@/lib/types';
 
 export default function DonationsPage() {
@@ -124,6 +124,7 @@ export default function DonationsPage() {
                         <Link href={`/sponsors/${d.sponsor_id}`} className="font-semibold hover:text-primary">
                           {d.sponsors?.full_name || 'Unknown'}
                         </Link>
+                        <Badge variant="outline" className="text-xs">{normalizeDonationType(d.type)}</Badge>
                         {d.food_type && <Badge variant="outline" className="text-xs">{d.food_type}</Badge>}
                       </div>
                       <div className="text-sm text-muted-foreground">

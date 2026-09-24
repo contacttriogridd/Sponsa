@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase/client';
 import type { Sponsor, FamilyMember, SpecialOccasion, Donation, Interaction, SponsorshipRequest } from '@/lib/types';
-import { formatCurrency, formatDate, formatDateShort, OCCASION_ICONS } from '@/lib/constants';
+import { formatCurrency, formatDate, formatDateShort, OCCASION_ICONS, normalizeDonationType } from '@/lib/constants';
 import { getNextOccurrence, daysUntil, getRelativeDayLabel } from '@/lib/date-utils';
 import { SponsorForm } from '@/components/shared/SponsorForm';
 import { FamilyMemberForm } from '@/components/shared/FamilyMemberForm';
@@ -92,8 +92,8 @@ export default function SponsorDetailPage() {
     ...donations.map((d) => ({
       id: d.id,
       type: 'donation' as TimelineEvent['type'],
-      title: `Donation recorded: ${formatCurrency(Number(d.amount))}`,
-      description: `${d.food_type || ''} for ${d.people_helped || 0} people${d.location ? ` · ${d.location}` : ''}`,
+      title: `${normalizeDonationType(d.type)} donation${Number(d.amount) ? `: ${formatCurrency(Number(d.amount))}` : ''}`,
+      description: `${[d.food_type, d.food_quantity].filter(Boolean).join(' · ') || normalizeDonationType(d.type)} for ${d.people_helped || 0} people${d.location ? ` · ${d.location}` : ''}`,
       date: d.created_at,
     })),
     ...requests.map((r) => ({
@@ -418,6 +418,7 @@ export default function SponsorDetailPage() {
                       <div className="font-medium">{d.occasion_name || 'Donation'}</div>
                       <div className="text-sm text-muted-foreground">
                         {formatDate(d.donation_date)}
+                        {` · ${normalizeDonationType(d.type)}`}
                         {d.food_type ? ` · ${d.food_type}` : ''}
                         {d.people_helped ? ` · ${d.people_helped} people` : ''}
                         {d.location ? ` · ${d.location}` : ''}

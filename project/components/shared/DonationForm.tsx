@@ -3,14 +3,35 @@
 import { useState } from 'react';
 import { Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from './DatePicker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/lib/supabase/client';
 import type { Donation } from '@/lib/types';
-import { FOOD_TYPES, PAYMENT_METHODS, formatCurrency } from '@/lib/constants';
+import { DONATION_TYPES, FOOD_TYPES, PAYMENT_METHODS, formatCurrency, normalizeDonationType } from '@/lib/constants';
 import { useAuth } from '@/lib/auth-context';
+
+// food_quantity / food_description columns hold the item details for every donation type.
+const QUANTITY_HINTS: Record<string, string> = {
+  Food: 'e.g. 100 meals',
+  Clothes: 'e.g. 50 sets',
+  Education: 'e.g. 5 students',
+  Groceries: 'e.g. 20 kits',
+  'Books & Stationery': 'e.g. 30 kits',
+  Money: 'e.g. 1 payment',
+};
+
+const DESCRIPTION_HINTS: Record<string, string> = {
+  Food: 'e.g. South Indian thali for 100 people',
+  Clothes: 'e.g. School uniforms and winter wear',
+  Education: 'e.g. School fees for 5 children',
+  Medical: 'e.g. Medicines and health check-up camp',
+  Groceries: 'e.g. Monthly ration kits',
+  'Books & Stationery': 'e.g. Notebooks, pens and bags',
+  Money: 'e.g. General fund contribution',
+};
 
 interface DonationFormProps {
   sponsorId: string;
@@ -32,7 +53,7 @@ export function DonationForm({
 
   const [form, setForm] = useState({
     donation_date: donation?.donation_date || new Date().toISOString().split('T')[0],
-    type: donation?.type || 'Food Sponsorship',
+    type: normalizeDonationType(donation?.type),
     amount: donation?.amount?.toString() || '',
     food_type: donation?.food_type || '',
     food_quantity: donation?.food_quantity || '',
@@ -51,9 +72,12 @@ export function DonationForm({
   const [busy, setBusy] = useState(false);
 
   const set = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
+  const isFood = form.type === 'Food';
+  const isMoney = form.type === 'Money';
 
   async function handleSubmit() {
-    if (!form.amount || isNaN(Number(form.amount))) { setError('Valid amount is required.'); return; }
+    if (isMoney && (!form.amount || isNaN(Number(form.amount)))) { setError('Valid amount is required.'); return; }
+    if (form.amount && isNaN(Number(form.amount))) { setError('Enter a valid value.'); return; }
     setBusy(true); setError('');
 
     const payload = {
@@ -63,8 +87,8 @@ export function DonationForm({
       occasion_name: form.occasion_name || null,
       donation_date: form.donation_date,
       type: form.type || null,
-      amount: Number(form.amount),
-      food_type: form.food_type || null,
+      amount: Number(form.amount) || 0,
+      food_type: isFood ? form.food_type || null : null,
       food_quantity: form.food_quantity || null,
       people_helped: Number(form.people_helped) || 0,
       location: form.location || null,
@@ -94,7 +118,7 @@ export function DonationForm({
       const { data: sponsor } = await supabase.from('sponsors').select('total_donations,people_helped').eq('id', sponsorId).single();
       if (sponsor) {
         await supabase.from('sponsors').update({
-          total_donations: Number(sponsor.total_donations || 0) + Number(form.amount),
+          total_donations: Number(sponsor.total_donations || 0) + (Number(form.amount) || 0),
           people_helped: Number(sponsor.people_helped || 0) + Number(form.people_helped || 0),
           last_contact_date: form.donation_date,
         }).eq('id', sponsorId);
@@ -109,8 +133,8 @@ export function DonationForm({
       await supabase.from('interactions').insert({
         sponsor_id: sponsorId,
         type: 'other',
-        summary: `Donation recorded: ${formatCurrency(Number(form.amount))}`,
-        details: `${form.food_type || 'Food'} for ${form.people_helped || 0} people. ${form.occasion_name ? `Occasion: ${form.occasion_name}` : ''}`,
+        summary: `${form.type} donation recorded${Number(form.amount) ? `: ${formatCurrency(Number(form.amount))}` : ''}`,
+        details: `${[isFood ? form.food_type : '', form.food_quantity, form.food_description].filter(Boolean).join(' · ') || form.type} for ${form.people_helped || 0} people. ${form.occasion_name ? `Occasion: ${form.occasion_name}` : ''}`,
         interaction_date: new Date().toISOString(),
         conducted_by: appUser?.id || null,
       });
@@ -130,19 +154,37 @@ export function DonationForm({
         </div>
       )}
       <div className="grid sm:grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label>Donation Date</Label>
-          <Input type="date" value={form.donation_date} onChange={(e) => set('donation_date', e.target.value)} />
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label>Donation Type</Label>
+          <div className="flex flex-wrap gap-2">
+            {DONATION_TYPES.map((t) => (
+              <Button
+                key={t}
+                type="button"
+                size="sm"
+                variant={form.type === t ? 'default' : 'outline'}
+                onClick={() => set('type', t)}
+              >
+                {t}
+              </Button>
+            ))}
+          </div>
         </div>
         <div className="space-y-1.5">
-          <Label>Amount (₹) <span className="text-destructive">*</span></Label>
-          <Input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} placeholder="15000" />
+          <Label>Donation Date</Label>
+          <DatePicker value={form.donation_date} onChange={(v) => set('donation_date', v)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>
+            {isMoney ? <>Amount (₹) <span className="text-destructive">*</span></> : 'Estimated Value (₹)'}
+          </Label>
+          <Input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} placeholder={isMoney ? '15000' : 'Optional'} />
         </div>
         <div className="space-y-1.5">
           <Label>Occasion</Label>
           <Input value={form.occasion_name} onChange={(e) => set('occasion_name', e.target.value)} placeholder="e.g. Birthday" />
         </div>
-        <div className="space-y-1.5">
+        {isFood && <div className="space-y-1.5">
           <Label>Food Type</Label>
           <Select value={form.food_type} onValueChange={(v) => set('food_type', v)}>
             <SelectTrigger><SelectValue placeholder="Select food type" /></SelectTrigger>
@@ -150,7 +192,7 @@ export function DonationForm({
               {FOOD_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
-        </div>
+        </div>}
         <div className="space-y-1.5">
           <Label>People Helped</Label>
           <Input type="number" value={form.people_helped} onChange={(e) => set('people_helped', e.target.value)} placeholder="100" />
@@ -177,12 +219,12 @@ export function DonationForm({
           <Input value={form.receipt_number} onChange={(e) => set('receipt_number', e.target.value)} placeholder="RCPT001" />
         </div>
         <div className="space-y-1.5">
-          <Label>Food Quantity</Label>
-          <Input value={form.food_quantity} onChange={(e) => set('food_quantity', e.target.value)} placeholder="e.g. 100 meals" />
+          <Label>{isFood ? 'Food Quantity' : 'Quantity'}</Label>
+          <Input value={form.food_quantity} onChange={(e) => set('food_quantity', e.target.value)} placeholder={QUANTITY_HINTS[form.type] || 'e.g. 10 items'} />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
-          <Label>Food Description</Label>
-          <Input value={form.food_description} onChange={(e) => set('food_description', e.target.value)} placeholder="e.g. South Indian thali for 100 people" />
+          <Label>{isFood ? 'Food Description' : 'Description'}</Label>
+          <Input value={form.food_description} onChange={(e) => set('food_description', e.target.value)} placeholder={DESCRIPTION_HINTS[form.type] || 'What was donated?'} />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Notes</Label>

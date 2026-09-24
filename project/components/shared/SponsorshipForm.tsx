@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Save, X, MessageCircle, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from './DatePicker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -136,7 +137,7 @@ VP Trust`;
         </div>
         <div className="space-y-1.5">
           <Label>Special Date</Label>
-          <Input type="date" value={form.special_date} onChange={(e) => set('special_date', e.target.value)} />
+          <DatePicker value={form.special_date} onChange={(v) => set('special_date', v)} />
         </div>
         <div className="space-y-1.5">
           <Label>Requested Amount (₹)</Label>

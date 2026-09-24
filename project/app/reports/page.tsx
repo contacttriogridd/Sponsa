@@ -126,7 +126,7 @@ export default function ReportsPage() {
 
   const exports = [
     { label: 'Sponsor Report', desc: 'All sponsor profiles and contact details', fn: exportSponsors },
-    { label: 'Donation Report', desc: 'All donations with amounts and food details', fn: exportDonations },
+    { label: 'Donation Report', desc: 'All donations with type, amount and item details', fn: exportDonations },
     { label: 'Sponsorship Report', desc: 'All sponsorship requests and statuses', fn: exportSponsorships },
     { label: 'Occasion Report', desc: 'All special occasions and dates', fn: exportOccasions },
   ];

@@ -53,7 +53,7 @@ export default function LoginPage() {
           Below that, it's rendered in normal flow (inside the centered column further down)
           so it scrolls with the page instead of sitting fixed on top of content that scrolls under it. */}
       <div className="hidden lg:flex fixed top-8 left-8 z-10 items-center gap-3 text-white">
-        <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center font-bold text-lg shadow-lg shadow-black/30">S</div>
+        <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center font-bold text-base tracking-tight shadow-lg shadow-black/30">VP</div>
         <span className="font-semibold text-lg tracking-tight drop-shadow-sm">VP Trust</span>
       </div>
 
@@ -64,7 +64,7 @@ export default function LoginPage() {
         {/* Story copy: same content everywhere, just scaled and re-aligned per breakpoint */}
         <div className="w-full lg:max-w-sm text-center lg:text-left text-white">
           <div className="flex lg:hidden items-center justify-center gap-3 text-white mb-5">
-            <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center font-bold text-base shadow-lg shadow-black/30">S</div>
+            <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center font-bold text-sm tracking-tight shadow-lg shadow-black/30">VP</div>
             <span className="font-semibold text-base tracking-tight drop-shadow-sm">VP Trust</span>
           </div>
           <span className="inline-block text-[10px] sm:text-xs font-medium tracking-wide uppercase text-white/80 bg-white/10 backdrop-blur-md border border-white/15 rounded-full px-2.5 py-1 sm:px-3 mb-3 sm:mb-4">Every occasion can create an impact</span>

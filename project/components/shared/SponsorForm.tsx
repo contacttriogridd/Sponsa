@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from './DatePicker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -205,7 +206,7 @@ export function SponsorForm({ sponsor, onSaved }: SponsorFormProps) {
           </div>
           <div className="space-y-1.5">
             <Label>Date of Birth</Label>
-            <Input type="date" value={form.dob} onChange={(e) => set('dob', e.target.value)} />
+            <DatePicker value={form.dob} onChange={(v) => set('dob', v)} />
           </div>
           <div className="space-y-1.5">
             <Label>Status</Label>
