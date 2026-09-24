@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.vercel.sponsa_five.twa",
+      "sha256_cert_fingerprints": [
+        "FA:57:03:7D:0C:99:CA:B8:86:01:0E:80:88:C7:F9:C4:BE:26:1A:25:FB:F4:F2:89:5C:44:7F:BA:36:1D:05:05"
+      ]
+    }
+  }
+]
