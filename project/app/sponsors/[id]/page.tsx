@@ -26,6 +26,7 @@ import { Timeline } from '@/components/shared/Timeline';
 import type { TimelineEvent } from '@/components/shared/Timeline';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { DeleteSponsorDialog } from '@/components/shared/DeleteSponsorDialog';
+import { DeleteRecordDialog, type DeletableRecord } from '@/components/shared/DeleteRecordDialog';
 import { useAuth } from '@/lib/auth-context';
 
 type DialogType = 'edit' | 'addFamily' | 'editFamily' | 'addOccasion' | 'editOccasion' | 'addDonation' | 'addSponsorship' | null;
@@ -42,6 +43,7 @@ export default function SponsorDetailPage() {
   const [donations, setDonations] = useState<Donation[]>([]);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [requests, setRequests] = useState<SponsorshipRequest[]>([]);
+  const [deletingRecord, setDeletingRecord] = useState<DeletableRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialog, setDialog] = useState<DialogType>(null);
   const [editingFamily, setEditingFamily] = useState<FamilyMember | null>(null);
@@ -402,11 +404,19 @@ export default function SponsorDetailPage() {
                         {r.requested_amount ? ` · ${formatCurrency(Number(r.requested_amount))}` : ''}
                       </div>
                     </div>
-                    <Badge variant={
-                      r.status === 'completed' ? 'default' :
-                      r.status === 'confirmed' ? 'default' :
-                      r.status === 'declined' ? 'destructive' : 'secondary'
-                    } className="capitalize">{r.status}</Badge>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Badge variant={
+                        r.status === 'completed' ? 'default' :
+                        r.status === 'confirmed' ? 'default' :
+                        r.status === 'declined' ? 'destructive' : 'secondary'
+                      } className="capitalize">{r.status}</Badge>
+                      {appUser?.role === 'admin' && (
+                        <Button variant="ghost" size="icon" className="text-destructive" aria-label="Delete sponsorship request"
+                          onClick={() => setDeletingRecord({ kind: 'sponsorship', id: r.id, label: `${normalizeDonationType(r.type)} request — ${r.occasion_name || 'Occasion'}` })}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </Card>
               ))
@@ -439,9 +449,20 @@ export default function SponsorDetailPage() {
                         {d.location ? ` · ${d.location}` : ''}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-semibold">{formatCurrency(Number(d.amount))}</div>
-                      {d.donation_id && <div className="text-xs text-muted-foreground">{d.donation_id}</div>}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <div className="text-right">
+                        <div className="font-semibold">{formatCurrency(Number(d.amount))}</div>
+                        {d.donation_id && <div className="text-xs text-muted-foreground">{d.donation_id}</div>}
+                      </div>
+                      {appUser?.role === 'admin' && (
+                        <Button variant="ghost" size="icon" className="text-destructive" aria-label="Delete donation"
+                          onClick={() => setDeletingRecord({
+                            kind: 'donation', id: d.id, sponsor_id: d.sponsor_id, amount: d.amount, people_helped: d.people_helped,
+                            label: `${normalizeDonationType(d.type)} donation on ${formatDate(d.donation_date)}`,
+                          })}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </Card>
@@ -521,6 +542,11 @@ export default function SponsorDetailPage() {
           </DialogContent>
         </Dialog>
       </div>
+      <DeleteRecordDialog
+        record={deletingRecord}
+        onOpenChange={(open) => { if (!open) setDeletingRecord(null); }}
+        onDeleted={() => load()}
+      />
       <DeleteSponsorDialog
         sponsor={deleteOpen ? sponsor : null}
         onOpenChange={setDeleteOpen}

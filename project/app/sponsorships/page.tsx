@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, HandHeart, Phone, MessageCircle } from 'lucide-react';
+import { Plus, HandHeart, Phone, MessageCircle, Trash2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,8 +11,12 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDateShort, normalizeDonationType, SPONSORSHIP_STATUS_LABELS } from '@/lib/constants';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
+import { DeleteRecordDialog, type DeletableRecord } from '@/components/shared/DeleteRecordDialog';
+import { useAuth } from '@/lib/auth-context';
 
 export default function SponsorshipsPage() {
+  const { appUser } = useAuth();
+  const [deleting, setDeleting] = useState<DeletableRecord | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
@@ -123,6 +127,12 @@ export default function SponsorshipsPage() {
                     <Link href={`/sponsors/${r.sponsor_id}`}>
                       <Button variant="outline" size="sm">View</Button>
                     </Link>
+                    {appUser?.role === 'admin' && (
+                      <Button variant="outline" size="icon" className="text-destructive" aria-label="Delete sponsorship request"
+                        onClick={() => setDeleting({ kind: 'sponsorship', id: r.id, label: `${r.sponsors?.full_name || 'Sponsor'} — ${normalizeDonationType(r.type)} request for ${r.occasion_name || 'occasion'}` })}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -137,6 +147,11 @@ export default function SponsorshipsPage() {
           </div>
         )}
       </div>
+      <DeleteRecordDialog
+        record={deleting}
+        onOpenChange={(open) => { if (!open) setDeleting(null); }}
+        onDeleted={(rec) => setItems((prev) => prev.filter((x) => x.id !== rec.id))}
+      />
     </AppLayout>
   );
 }

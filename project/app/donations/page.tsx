@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Gift, Plus } from 'lucide-react';
+import { Gift, Plus, Trash2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,15 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DonationForm } from '@/components/shared/DonationForm';
+import { DeleteRecordDialog, type DeletableRecord } from '@/components/shared/DeleteRecordDialog';
+import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDate, normalizeDonationType } from '@/lib/constants';
 import type { Sponsor } from '@/lib/types';
 
 export default function DonationsPage() {
+  const { appUser } = useAuth();
+  const [deleting, setDeleting] = useState<DeletableRecord | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [filter, setFilter] = useState('all');
@@ -135,9 +139,20 @@ export default function DonationsPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-bold text-success">{formatCurrency(Number(d.amount))}</div>
-                    {d.donation_id && <div className="text-xs text-muted-foreground">{d.donation_id}</div>}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <div className="text-right">
+                      <div className="font-bold text-success">{formatCurrency(Number(d.amount))}</div>
+                      {d.donation_id && <div className="text-xs text-muted-foreground">{d.donation_id}</div>}
+                    </div>
+                    {appUser?.role === 'admin' && (
+                      <Button variant="ghost" size="icon" className="text-destructive" aria-label="Delete donation"
+                        onClick={() => setDeleting({
+                          kind: 'donation', id: d.id, sponsor_id: d.sponsor_id, amount: d.amount, people_helped: d.people_helped,
+                          label: `${d.sponsors?.full_name || 'Sponsor'} — ${normalizeDonationType(d.type)} donation on ${formatDate(d.donation_date)}`,
+                        })}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -182,6 +197,11 @@ export default function DonationsPage() {
           </div>
         </DialogContent>
       </Dialog>
+      <DeleteRecordDialog
+        record={deleting}
+        onOpenChange={(open) => { if (!open) setDeleting(null); }}
+        onDeleted={(rec) => setItems((prev) => prev.filter((x) => x.id !== rec.id))}
+      />
     </AppLayout>
   );
 }
