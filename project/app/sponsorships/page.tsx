@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase/client';
-import { formatCurrency, formatDateShort, SPONSORSHIP_STATUS_LABELS } from '@/lib/constants';
+import { formatCurrency, formatDateShort, normalizeDonationType, SPONSORSHIP_STATUS_LABELS } from '@/lib/constants';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
 
 export default function SponsorshipsPage() {
@@ -51,7 +51,7 @@ export default function SponsorshipsPage() {
       <div className="space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <p className="text-sm text-muted-foreground">Food Sponsorship</p>
+            <p className="text-sm text-muted-foreground">Sponsorship Requests</p>
             <h1 className="text-2xl font-semibold mt-1">Sponsorships</h1>
             <p className="text-sm text-muted-foreground mt-1">Track every sponsorship request and its outcome.</p>
           </div>
@@ -101,7 +101,7 @@ export default function SponsorshipsPage() {
                       </span>
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">
-                      {r.occasion_name || 'Occasion'}
+                      {normalizeDonationType(r.type)} · {r.occasion_name || 'Occasion'}
                       {r.special_date ? ` · ${formatDateShort(r.special_date)}` : ''}
                       {r.food_type ? ` · ${r.food_type}` : ''}
                       {r.people_count ? ` · ${r.people_count} people` : ''}

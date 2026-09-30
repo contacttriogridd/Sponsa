@@ -117,6 +117,8 @@ export interface SponsorshipRequest {
   occasion_id: string | null;
   occasion_name: string | null;
   special_date: string | null;
+  /** Missing until migration 00006 is applied; null means an older food request. */
+  type?: string | null;
   requested_amount: number | null;
   food_type: string | null;
   people_count: number | null;

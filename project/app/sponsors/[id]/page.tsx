@@ -103,7 +103,7 @@ export default function SponsorDetailPage() {
     ...requests.map((r) => ({
       id: r.id,
       type: 'sponsorship' as TimelineEvent['type'],
-      title: `Sponsorship request — ${r.occasion_name || 'Occasion'}`,
+      title: `${normalizeDonationType(r.type)} sponsorship request — ${r.occasion_name || 'Occasion'}`,
       description: `Status: ${r.status}`,
       date: r.created_at,
     })),
@@ -395,7 +395,8 @@ export default function SponsorDetailPage() {
                     <div>
                       <div className="font-medium">{r.occasion_name || 'Sponsorship Request'}</div>
                       <div className="text-sm text-muted-foreground">
-                        {r.special_date ? formatDate(r.special_date) : ''}
+                        {normalizeDonationType(r.type)}
+                        {r.special_date ? ` · ${formatDate(r.special_date)}` : ''}
                         {r.food_type ? ` · ${r.food_type}` : ''}
                         {r.people_count ? ` · ${r.people_count} people` : ''}
                         {r.requested_amount ? ` · ${formatCurrency(Number(r.requested_amount))}` : ''}
