@@ -1,6 +1,12 @@
 import type { Sponsor, SpecialOccasion } from '@/lib/types';
 import { getNextOccurrence } from '@/lib/date-utils';
 import { OCCASION_ICONS } from '@/lib/constants';
+import { occasionHeadline, occasionRelation } from '@/lib/occasion-text';
+
+function relationSuffix(occasion: SpecialOccasion, sponsorName: string): string {
+  const relation = occasionRelation(occasion, sponsorName);
+  return relation ? ` (${relation})` : '';
+}
 
 // Kept free of the browser Supabase client so the server cron route can use it too.
 
@@ -57,7 +63,7 @@ export function getDueReminders(
         sponsor,
         daysBefore,
         occurrenceYear: next.occurrenceYear,
-        title: `${icon} ${occasion.person_name}'s ${occasion.occasion_type} ${reminderLabel(daysBefore)}`,
+        title: `${icon} ${occasionHeadline(occasion, sponsor.full_name)}${relationSuffix(occasion, sponsor.full_name)} ${reminderLabel(daysBefore)}`,
         message: `${sponsor.full_name} — consider reaching out about a sponsorship.`,
       });
     }

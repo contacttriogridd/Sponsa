@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase/client';
 import type { Sponsor, FamilyMember, SpecialOccasion, Donation, Interaction, SponsorshipRequest } from '@/lib/types';
 import { formatCurrency, formatDate, formatDateShort, OCCASION_ICONS, normalizeDonationType } from '@/lib/constants';
 import { getNextOccurrence, daysUntil, getRelativeDayLabel } from '@/lib/date-utils';
+import { occasionDateLine, occasionHeadline, occasionRelation } from '@/lib/occasion-text';
 import { SponsorForm } from '@/components/shared/SponsorForm';
 import { FamilyMemberForm } from '@/components/shared/FamilyMemberForm';
 import { OccasionForm } from '@/components/shared/OccasionForm';
@@ -175,7 +176,12 @@ export default function SponsorDetailPage() {
               {nextOccasion && (
                 <div className="mt-2 inline-flex items-center gap-1.5 text-sm bg-primary/10 text-primary px-3 py-1 rounded-full">
                   <span>{OCCASION_ICONS[nextOccasion.occasion.occasion_type] || '⭐'}</span>
-                  <span>{nextOccasion.occasion.occasion_type} · {getRelativeDayLabel(nextOccasion.days)}</span>
+                  <span>
+                    {occasionHeadline(nextOccasion.occasion, sponsor.full_name)}
+                    {nextOccasion.occasion.relationship && occasionRelation(nextOccasion.occasion, sponsor.full_name)
+                      ? ` (${nextOccasion.occasion.relationship.toLowerCase()})` : ''}
+                    {' · '}{getRelativeDayLabel(nextOccasion.days)}
+                  </span>
                 </div>
               )}
             </div>
@@ -352,15 +358,18 @@ export default function SponsorDetailPage() {
                       <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-lg">
                         {OCCASION_ICONS[o.occasion_type] || '⭐'}
                       </div>
-                      <div className="flex-1">
-                        <div className="font-medium">{o.person_name}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium">{occasionHeadline(o, sponsor.full_name)}</div>
+                        {occasionRelation(o, sponsor.full_name) && (
+                          <div className="text-sm">{occasionRelation(o, sponsor.full_name)}</div>
+                        )}
                         <div className="text-sm text-muted-foreground">
-                          {o.relationship && o.relationship !== 'Self' ? `${o.relationship} · ` : ''}
-                          {o.occasion_type} · {formatDate(o.occasion_date)}
+                          {occasionDateLine(o, next?.occurrenceYear)}
                           {days !== null && days >= 0 && days <= 30 && (
                             <span className="ml-2 text-primary font-medium">{getRelativeDayLabel(days)}</span>
                           )}
                         </div>
+                        {o.notes && <div className="text-sm text-muted-foreground mt-0.5 break-words">Note: {o.notes}</div>}
                       </div>
                       <div className="flex items-center gap-1">
                         {o.is_auto_generated && <Badge variant="outline" className="text-xs">Auto</Badge>}
