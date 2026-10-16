@@ -86,6 +86,30 @@ export interface SpecialOccasion {
   updated_at: string;
 }
 
+export type FamilyEventCategory = 'birthday' | 'anniversary' | 'death_anniversary';
+
+/** A signed-in user's own family date (migration 00007). Private to that user via RLS. */
+export interface FamilyEvent {
+  id: string;
+  user_id: string;
+  person_name: string;
+  event_category: FamilyEventCategory;
+  /** One of the keys in FAMILY_EVENT_TYPES (lib/family-events.ts). */
+  event_type: string;
+  relationship: string;
+  event_day: number;
+  event_month: number;
+  /** Null when the original year is not known. */
+  event_year: number | null;
+  notes: string | null;
+  reminder_enabled: boolean;
+  reminder_days_before: number[];
+  whatsapp_reminder: boolean;
+  last_reminded_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Reminder {
   id: string;
   occasion_id: string;
