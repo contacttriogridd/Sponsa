@@ -19,9 +19,11 @@ import { useAuth } from '@/lib/auth-context';
 interface SponsorFormProps {
   sponsor?: Sponsor;
   onSaved?: (sponsor: Sponsor) => void;
+  /** Extra section rendered just above Notes (the Add Sponsor page puts Family Events here). */
+  beforeNotes?: React.ReactNode;
 }
 
-export function SponsorForm({ sponsor, onSaved }: SponsorFormProps) {
+export function SponsorForm({ sponsor, onSaved, beforeNotes }: SponsorFormProps) {
   const router = useRouter();
   const { appUser } = useAuth();
   const isEdit = !!sponsor;
@@ -295,6 +297,8 @@ export function SponsorForm({ sponsor, onSaved }: SponsorFormProps) {
           </div>
         </div>
       </Card>
+
+      {beforeNotes}
 
       <Card className="p-5 space-y-4">
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Notes</h3>

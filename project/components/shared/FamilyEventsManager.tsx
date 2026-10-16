@@ -134,12 +134,12 @@ export function FamilyEventsManager({ onCountChange }: FamilyEventsManagerProps)
     <div className="space-y-5 text-base">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Family Events &amp; Reminders</h2>
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Family Events &amp; Reminders</h3>
           <p className="text-muted-foreground mt-1">
             Birthdays, anniversaries and remembrance days of your family, in one place.
           </p>
         </div>
-        <Button size="lg" className="h-12 text-base px-6 shrink-0" onClick={() => openAdd()} disabled={!!loadError}>
+        <Button type="button" size="lg" className="h-12 text-base px-6 shrink-0" onClick={() => openAdd()} disabled={!!loadError}>
           <Plus className="h-5 w-5 mr-2" />Add Family Event
         </Button>
       </div>
