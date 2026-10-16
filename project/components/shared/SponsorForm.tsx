@@ -142,19 +142,8 @@ export function SponsorForm({ sponsor, onSaved }: SponsorFormProps) {
       setBusy(false);
       if (err) { setError('Unable to save sponsor. Please try again.'); return; }
       const newSponsor = data as Sponsor;
-      // Auto-create birthday occasion from DOB
-      if (form.dob) {
-        await supabase.from('special_occasions').insert({
-          sponsor_id: newSponsor.id,
-          person_name: form.full_name.trim(),
-          relationship: 'Self',
-          occasion_type: 'Birthday',
-          occasion_date: form.dob,
-          recurring_yearly: true,
-          is_auto_generated: true,
-          active: true,
-        });
-      }
+      // Only the days the user added themselves become special occasions —
+      // Date of Birth no longer creates a birthday on its own.
       if (familyDays.length > 0) {
         const { error: occErr } = await supabase
           .from('special_occasions')

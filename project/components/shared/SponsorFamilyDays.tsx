@@ -52,7 +52,7 @@ export function SponsorFamilyDays({ value, onChange }: SponsorFamilyDaysProps) {
         <div>
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Special Days &amp; Family Events</h3>
           <p className="text-muted-foreground mt-1">
-            Birthdays, anniversaries and remembrance days. The sponsor&apos;s own birthday is added from Date of Birth.
+            Birthdays, anniversaries and remembrance days. Only the events you add here are saved as special days.
           </p>
         </div>
         <Button type="button" size="lg" className="h-12 text-base px-6 shrink-0" onClick={() => openAdd()}>
