@@ -6,47 +6,40 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/lib/supabase/client';
-import { useAuth } from '@/lib/auth-context';
-import type { FamilyEvent, FamilyEventCategory } from '@/lib/types';
 import {
   FAMILY_EVENT_CATEGORIES, FAMILY_EVENT_TYPES, FAMILY_RELATIONSHIPS, MONTHS,
-  daysInMonth, describeFamilyEventError, getEventTypesForCategory, validateFamilyEventInput,
-  type FamilyEventInput,
+  daysInMonth, getEventTypesForCategory, validateFamilyEventInput,
+  type FamilyEventCategory, type FamilyEventInput,
 } from '@/lib/family-events';
 
 const CUSTOM = '__custom__';
 const field = 'h-12 text-base';
 
 interface FamilyEventFormProps {
-  event?: FamilyEvent;
+  initial?: FamilyEventInput;
   defaultCategory?: FamilyEventCategory;
-  onSaved: (event: FamilyEvent, isEdit: boolean) => void;
+  onSubmit: (input: FamilyEventInput) => void;
   onCancel: () => void;
 }
 
-export function FamilyEventForm({ event, defaultCategory, onSaved, onCancel }: FamilyEventFormProps) {
-  const { appUser } = useAuth();
-  const isEdit = !!event;
-  const knownRelationship = !event || (FAMILY_RELATIONSHIPS as readonly string[]).includes(event.relationship);
+export function FamilyEventForm({ initial, defaultCategory, onSubmit, onCancel }: FamilyEventFormProps) {
+  const isEdit = !!initial;
+  const knownRelationship = !initial || (FAMILY_RELATIONSHIPS as readonly string[]).includes(initial.relationship);
 
-  const [form, setForm] = useState<FamilyEventInput>({
-    person_name: event?.person_name || '',
-    event_category: event?.event_category || defaultCategory || '',
-    event_type: event?.event_type || '',
-    relationship: event?.relationship || '',
-    event_day: event?.event_day ?? null,
-    event_month: event?.event_month ?? null,
-    event_year: event?.event_year ?? null,
-    notes: event?.notes || '',
+  const [form, setForm] = useState<FamilyEventInput>(initial || {
+    person_name: '',
+    event_category: defaultCategory || '',
+    event_type: '',
+    relationship: '',
+    event_day: null,
+    event_month: null,
+    event_year: null,
+    notes: '',
   });
   const [customRelationship, setCustomRelationship] = useState(!knownRelationship);
-  const [yearText, setYearText] = useState(event?.event_year ? String(event.event_year) : '');
-  const [whatsappReminder, setWhatsappReminder] = useState(event?.whatsapp_reminder ?? false);
+  const [yearText, setYearText] = useState(initial?.event_year ? String(initial.event_year) : '');
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
 
   const set = <K extends keyof FamilyEventInput>(key: K, value: FamilyEventInput[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -77,42 +70,17 @@ export function FamilyEventForm({ event, defaultCategory, onSaved, onCancel }: F
 
   const maxDay = form.event_month ? daysInMonth(form.event_month, form.event_year) : 31;
 
-  async function handleSubmit() {
-    if (yearText && yearText.length !== 4) { setError('Please enter the year with 4 digits, e.g. 1978, or leave it blank.'); return; }
+  function handleSubmit() {
+    if (yearText && yearText.length !== 4) { setError('Please enter the year with 4 digits, e.g. 1978.'); return; }
     const problem = validateFamilyEventInput(form);
     if (problem) { setError(problem); return; }
-    if (!appUser) { setError('Your session has ended. Please sign in again.'); return; }
-
-    setBusy(true);
-    setError('');
-
-    const payload = {
-      user_id: appUser.id,
-      person_name: form.person_name.trim(),
-      event_category: form.event_category,
-      event_type: form.event_type,
-      relationship: form.relationship.trim(),
-      event_day: form.event_day,
-      event_month: form.event_month,
-      event_year: form.event_year,
-      notes: form.notes.trim() || null,
-      whatsapp_reminder: whatsappReminder,
-    };
-
-    const query = isEdit
-      ? supabase.from('family_events').update(payload).eq('id', event!.id).select().single()
-      : supabase.from('family_events').insert(payload).select().single();
-    const { data, error: err } = await query;
-    setBusy(false);
-
-    if (err || !data) { setError(describeFamilyEventError(err, 'Unable to save this event. Please try again.')); return; }
-    onSaved(data as FamilyEvent, isEdit);
+    onSubmit({ ...form, person_name: form.person_name.trim(), relationship: form.relationship.trim(), notes: form.notes.trim() });
   }
 
   return (
     <form
       className="space-y-5"
-      onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}
+      onSubmit={(e) => { e.preventDefault(); e.stopPropagation(); handleSubmit(); }}
       noValidate
     >
       {error && (
@@ -226,9 +194,7 @@ export function FamilyEventForm({ event, defaultCategory, onSaved, onCancel }: F
             aria-label="Year"
           />
         </div>
-        <p className="text-sm text-muted-foreground">
-          Leave the year blank if you don&apos;t know it. Events repeat every year on this day.
-        </p>
+        <p className="text-sm text-muted-foreground">Reminders repeat every year on this day.</p>
       </fieldset>
 
       <div className="space-y-2">
@@ -244,23 +210,13 @@ export function FamilyEventForm({ event, defaultCategory, onSaved, onCancel }: F
         />
       </div>
 
-      <div className="flex items-start gap-3 rounded-lg border border-border p-4">
-        <Switch id="fe-whatsapp" checked={whatsappReminder} onCheckedChange={setWhatsappReminder} className="mt-0.5" />
-        <div>
-          <Label htmlFor="fe-whatsapp" className="text-base cursor-pointer">Remind me on WhatsApp</Label>
-          <p className="text-sm text-muted-foreground mt-1">
-            WhatsApp reminders for family events are not switched on yet. Your choice is saved and will be used once they are.
-          </p>
-        </div>
-      </div>
-
       <div className="flex flex-col-reverse sm:flex-row gap-3 pt-1">
         <Button type="button" variant="outline" size="lg" className="h-12 text-base" onClick={onCancel}>
           <X className="h-5 w-5 mr-2" />Cancel
         </Button>
-        <Button type="submit" size="lg" className="h-12 text-base sm:min-w-44" disabled={busy}>
+        <Button type="submit" size="lg" className="h-12 text-base sm:min-w-44">
           <Save className="h-5 w-5 mr-2" />
-          {busy ? 'Saving...' : isEdit ? 'Save Changes' : 'Save Event'}
+          {isEdit ? 'Update Event' : 'Add Event'}
         </Button>
       </div>
     </form>

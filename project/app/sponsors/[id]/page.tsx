@@ -355,6 +355,7 @@ export default function SponsorDetailPage() {
                       <div className="flex-1">
                         <div className="font-medium">{o.person_name}</div>
                         <div className="text-sm text-muted-foreground">
+                          {o.relationship && o.relationship !== 'Self' ? `${o.relationship} · ` : ''}
                           {o.occasion_type} · {formatDate(o.occasion_date)}
                           {days !== null && days >= 0 && days <= 30 && (
                             <span className="ml-2 text-primary font-medium">{getRelativeDayLabel(days)}</span>

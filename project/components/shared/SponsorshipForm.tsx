@@ -41,7 +41,19 @@ export function SponsorshipForm({ sponsor, occasion, request, onSaved, onCancel 
     ? new Date(occasion.occasion_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })
     : '';
 
-  const buildMessage = (type: string) => `Dear ${sponsor.preferred_name || sponsor.full_name},
+  const isRemembrance = occasion?.occasion_type === 'Death Anniversary';
+  const whose = occasion && occasion.relationship && occasion.relationship !== 'Self'
+    ? `the death anniversary of your ${occasion.relationship.toLowerCase()}, ${occasion.person_name},`
+    : `the death anniversary of ${occasion?.person_name || 'your loved one'}`;
+
+  const buildMessage = (type: string) => isRemembrance ? `Dear ${sponsor.preferred_name || sponsor.full_name},
+
+We remember with you that ${whose} falls${nextDate ? ` on ${nextDate}` : ' soon'}. If you wish, you can honour their memory by ${REQUEST_PHRASES[type] || 'supporting people who are in need'}.
+
+Your kindness can bring ${type === 'Food' ? 'nourishment' : 'hope'} to someone who truly needs it.
+
+With respect,
+VP Trust` : `Dear ${sponsor.preferred_name || sponsor.full_name},
 
 Your ${occasion?.occasion_type || 'special day'} is coming up${nextDate ? ` on ${nextDate}` : ''}. We would like to wish you in advance and invite you to celebrate your special day by ${REQUEST_PHRASES[type] || 'supporting people who are in need'}.
 

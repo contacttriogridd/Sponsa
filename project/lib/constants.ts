@@ -13,6 +13,7 @@ export const RELATIONSHIPS = [
 export const OCCASION_TYPES = [
   'Birthday',
   'Wedding Anniversary',
+  'Death Anniversary',
   'Business Anniversary',
   'Achievement',
   'Celebration',
@@ -22,6 +23,7 @@ export const OCCASION_TYPES = [
 export const OCCASION_ICONS: Record<string, string> = {
   Birthday: '🎂',
   'Wedding Anniversary': '💍',
+  'Death Anniversary': '🪔',
   'Business Anniversary': '🏢',
   Achievement: '🏆',
   Celebration: '🎉',

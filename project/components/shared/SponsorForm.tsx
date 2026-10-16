@@ -15,15 +15,15 @@ import { supabase } from '@/lib/supabase/client';
 import type { Sponsor } from '@/lib/types';
 import { COMMUNICATION_PREFERENCES } from '@/lib/constants';
 import { useAuth } from '@/lib/auth-context';
+import { toSpecialOccasion } from '@/lib/family-events';
+import { SponsorFamilyDays, type FamilyDayDraft } from './SponsorFamilyDays';
 
 interface SponsorFormProps {
   sponsor?: Sponsor;
   onSaved?: (sponsor: Sponsor) => void;
-  /** Extra section rendered just above Notes (the Add Sponsor page puts Family Events here). */
-  beforeNotes?: React.ReactNode;
 }
 
-export function SponsorForm({ sponsor, onSaved, beforeNotes }: SponsorFormProps) {
+export function SponsorForm({ sponsor, onSaved }: SponsorFormProps) {
   const router = useRouter();
   const { appUser } = useAuth();
   const isEdit = !!sponsor;
@@ -51,6 +51,8 @@ export function SponsorForm({ sponsor, onSaved, beforeNotes }: SponsorFormProps)
   const [busy, setBusy] = useState(false);
   const [duplicates, setDuplicates] = useState<Sponsor[]>([]);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [familyDays, setFamilyDays] = useState<FamilyDayDraft[]>([]);
+  const [createdId, setCreatedId] = useState<string | null>(null);
 
   const set = (key: string, value: string | boolean) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -152,6 +154,18 @@ export function SponsorForm({ sponsor, onSaved, beforeNotes }: SponsorFormProps)
           is_auto_generated: true,
           active: true,
         });
+      }
+      if (familyDays.length > 0) {
+        const { error: occErr } = await supabase
+          .from('special_occasions')
+          .insert(familyDays.map((d) => toSpecialOccasion(d, newSponsor.id)));
+        if (occErr) {
+          // The sponsor exists now, so don't let a retry create a duplicate.
+          setCreatedId(newSponsor.id);
+          setError('The sponsor was created, but the family events could not be saved. Please add them from the sponsor\'s Special Days tab.');
+          onSaved?.(newSponsor);
+          return;
+        }
       }
       onSaved?.(newSponsor);
       router.push(`/sponsors/${newSponsor.id}`);
@@ -298,7 +312,7 @@ export function SponsorForm({ sponsor, onSaved, beforeNotes }: SponsorFormProps)
         </div>
       </Card>
 
-      {beforeNotes}
+      {!isEdit && <SponsorFamilyDays value={familyDays} onChange={setFamilyDays} />}
 
       <Card className="p-5 space-y-4">
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Notes</h3>
@@ -311,10 +325,16 @@ export function SponsorForm({ sponsor, onSaved, beforeNotes }: SponsorFormProps)
       </Card>
 
       <div className="flex gap-3 pb-4">
+        {createdId ? (
+          <Button onClick={() => router.push(`/sponsors/${createdId}`)} className="flex-1 sm:flex-none sm:min-w-32">
+            Open Sponsor
+          </Button>
+        ) : (
         <Button onClick={() => handleSubmit()} disabled={busy} className="flex-1 sm:flex-none sm:min-w-32">
           <Save className="h-4 w-4 mr-2" />
           {busy ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Sponsor'}
         </Button>
+        )}
         <Button variant="outline" onClick={() => router.back()}>
           <X className="h-4 w-4 mr-2" />
           Cancel

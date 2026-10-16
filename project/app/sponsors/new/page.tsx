@@ -2,8 +2,6 @@
 
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SponsorForm } from '@/components/shared/SponsorForm';
-import { FamilyEventsManager } from '@/components/shared/FamilyEventsManager';
-import { Card } from '@/components/ui/card';
 
 export default function NewSponsorPage() {
   return (
@@ -16,13 +14,7 @@ export default function NewSponsorPage() {
             Start with a name and date of birth. Everything else can be added later.
           </p>
         </div>
-        <SponsorForm
-          beforeNotes={
-            <Card id="family-events" className="p-5 scroll-mt-20">
-              <FamilyEventsManager />
-            </Card>
-          }
-        />
+        <SponsorForm />
       </div>
     </AppLayout>
   );
