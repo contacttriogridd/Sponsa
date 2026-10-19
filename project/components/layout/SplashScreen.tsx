@@ -45,9 +45,8 @@ export function SplashScreen() {
       <img src="/splash.jpg" alt="" className="absolute inset-0 h-full w-full object-cover" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/10" />
       <div className="absolute inset-x-0 bottom-0 flex flex-col items-center px-6 pb-16 text-center text-white">
-        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[#8173C9] text-3xl font-bold tracking-tight shadow-lg ring-4 ring-white/30">
-          VP
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/vp-trust-mark.png" alt="VP Trust" className="h-28 w-28 object-contain drop-shadow-xl" />
         <div className="mt-4 text-3xl font-semibold">VP Trust</div>
         <div className="mt-1 text-sm text-white/85">Serving people in need</div>
       </div>

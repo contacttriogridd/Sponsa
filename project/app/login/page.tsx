@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Heart, Mail, Lock, User, ArrowRight } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -53,7 +53,8 @@ export default function LoginPage() {
           Below that, it's rendered in normal flow (inside the centered column further down)
           so it scrolls with the page instead of sitting fixed on top of content that scrolls under it. */}
       <div className="hidden lg:flex fixed top-8 left-8 z-10 items-center gap-3 text-white">
-        <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center font-bold text-base tracking-tight shadow-lg shadow-black/30">VP</div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/vp-trust-mark.png" alt="" className="h-12 w-12 object-contain drop-shadow-lg" />
         <span className="font-semibold text-lg tracking-tight drop-shadow-sm">VP Trust</span>
       </div>
 
@@ -64,7 +65,8 @@ export default function LoginPage() {
         {/* Story copy: same content everywhere, just scaled and re-aligned per breakpoint */}
         <div className="w-full lg:max-w-sm text-center lg:text-left text-white">
           <div className="flex lg:hidden items-center justify-center gap-3 text-white mb-5">
-            <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center font-bold text-sm tracking-tight shadow-lg shadow-black/30">VP</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/vp-trust-mark.png" alt="" className="h-11 w-11 object-contain drop-shadow-lg" />
             <span className="font-semibold text-base tracking-tight drop-shadow-sm">VP Trust</span>
           </div>
           <span className="inline-block text-[10px] sm:text-xs font-medium tracking-wide uppercase text-white/80 bg-white/10 backdrop-blur-md border border-white/15 rounded-full px-2.5 py-1 sm:px-3 mb-3 sm:mb-4">Every occasion can create an impact</span>
@@ -77,7 +79,8 @@ export default function LoginPage() {
         <div className="w-full max-w-md shrink-0">
           <div className="rounded-3xl border border-white/15 bg-black/30 backdrop-blur-2xl shadow-2xl shadow-black/50 p-6 sm:p-8 lg:p-10">
             <div className="mb-6 sm:mb-8">
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center mb-4 sm:mb-5"><Heart className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /></div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/vp-trust-mark.png" alt="VP Trust" className="h-16 w-16 sm:h-20 sm:w-20 object-contain mb-4 sm:mb-5" />
               <h2 className="text-xl sm:text-2xl font-semibold text-white">{mode === 'login' ? 'Welcome back' : 'Create your account'}</h2>
               <p className="text-white/60 mt-2 text-sm sm:text-base">{mode === 'login' ? 'Sign in to continue your work.' : 'Start managing meaningful connections.'}</p>
             </div>

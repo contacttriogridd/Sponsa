@@ -76,10 +76,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const SidebarContent = (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-6 py-5 border-b border-border">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm tracking-tight">
-          VP
-        </div>
+      <div className="flex items-center gap-3 px-6 py-5 border-b border-border">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/vp-trust-mark.png" alt="VP Trust" className="h-11 w-11 object-contain shrink-0" />
         <div>
           <div className="font-semibold text-sm">VP Trust</div>
           <div className="text-xs text-muted-foreground">Sponsor Management</div>

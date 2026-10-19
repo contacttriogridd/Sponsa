@@ -10,7 +10,10 @@ export const metadata: Metadata = {
   description: 'Manage sponsors, special occasions, food sponsorships, and donations with clarity.',
   themeColor: '#8173C9',
   appleWebApp: { capable: true, title: 'VP Trust', statusBarStyle: 'default' },
-  icons: { icon: '/icons/192', apple: '/icons/apple' },
+  icons: {
+    icon: [{ url: '/brand/favicon-48.png', sizes: '48x48' }, { url: '/brand/icon-192.png', sizes: '192x192' }],
+    apple: '/brand/apple-touch-icon.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
