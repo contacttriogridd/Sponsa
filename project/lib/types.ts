@@ -14,6 +14,9 @@ export interface AppUser {
 export interface OrganizationSettings {
   id: string;
   name: string;
+  /** Added by migration 00009; absent on older databases. */
+  org_name_en?: string | null;
+  org_name_ta?: string | null;
   logo_url: string | null;
   phone: string | null;
   email: string | null;

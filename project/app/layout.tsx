@@ -1,9 +1,12 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Noto_Sans_Tamil } from 'next/font/google';
 import { Providers } from './providers';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+// Fallback for Tamil text (e.g. the organization's Tamil name). Self-hosted by
+// next/font, and only downloaded when Tamil characters appear on the page.
+const notoSansTamil = Noto_Sans_Tamil({ subsets: ['tamil'], variable: '--font-tamil', preload: false });
 
 export const metadata: Metadata = {
   title: 'VP Trust | Compassionate Sponsorship Management',
@@ -18,8 +21,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className={`${inter.variable} ${notoSansTamil.variable}`}>
+      <body>
         <Providers>{children}</Providers>
       </body>
     </html>

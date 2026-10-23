@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
-import type { Sponsor, MessageTemplate } from '@/lib/types';
+import type { Sponsor } from '@/lib/types';
 
 export interface SendMessageResult {
   success: boolean;
@@ -21,17 +21,6 @@ export async function isWhatsAppConfigured(): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-export function buildMessageFromTemplate(
-  template: MessageTemplate,
-  variables: Record<string, string>
-): string {
-  let body = template.body;
-  for (const [key, value] of Object.entries(variables)) {
-    body = body.replaceAll(`{{${key}}}`, value);
-  }
-  return body;
 }
 
 export async function sendWhatsAppMessage(
@@ -110,6 +99,7 @@ export async function sendWhatsAppMessage(
   }
 }
 
+/** wa.me link; the message is percent-encoded as UTF-8 so Tamil text and line breaks survive. */
 export function buildWhatsAppUrl(phone: string, message?: string): string {
   const cleaned = phone.replace(/\D/g, '');
   const base = `https://wa.me/${cleaned}`;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Save, X, MessageCircle, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from './DatePicker';
@@ -13,6 +13,8 @@ import type { Sponsor, SponsorshipRequest, SpecialOccasion } from '@/lib/types';
 import { DONATION_TYPES, FOOD_TYPES, SPONSORSHIP_STATUSES, SPONSORSHIP_STATUS_LABELS, formatDateShort, normalizeDonationType } from '@/lib/constants';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { useAuth } from '@/lib/auth-context';
+import { renderTemplate } from '@/lib/templates';
+import { useOrganizationNames } from '@/lib/use-organization-names';
 
 // How each request type is described in the suggested WhatsApp message.
 const REQUEST_PHRASES: Record<string, string> = {
@@ -35,6 +37,7 @@ interface SponsorshipFormProps {
 
 export function SponsorshipForm({ sponsor, occasion, request, onSaved, onCancel }: SponsorshipFormProps) {
   const { appUser } = useAuth();
+  const organizationNames = useOrganizationNames();
   const isEdit = !!request;
 
   const nextDate = occasion?.occasion_date
@@ -46,14 +49,14 @@ export function SponsorshipForm({ sponsor, occasion, request, onSaved, onCancel 
     ? `the death anniversary of your ${occasion.relationship.toLowerCase()}, ${occasion.person_name},`
     : `the death anniversary of ${occasion?.person_name || 'your loved one'}`;
 
-  const buildMessage = (type: string) => isRemembrance ? `Dear ${sponsor.preferred_name || sponsor.full_name},
+  const buildMessage = (type: string) => renderTemplate(isRemembrance ? `Dear ${sponsor.preferred_name || sponsor.full_name},
 
 We remember with you that ${whose} falls${nextDate ? ` on ${nextDate}` : ' soon'}. If you wish, you can honour their memory by ${REQUEST_PHRASES[type] || 'supporting people who are in need'}.
 
 Your kindness can bring ${type === 'Food' ? 'nourishment' : 'hope'} to someone who truly needs it.
 
 With respect,
-VP Trust` : `Dear ${sponsor.preferred_name || sponsor.full_name},
+{{organization_name}}` : `Dear ${sponsor.preferred_name || sponsor.full_name},
 
 Your ${occasion?.occasion_type || 'special day'} is coming up${nextDate ? ` on ${nextDate}` : ''}. We would like to wish you in advance and invite you to celebrate your special day by ${REQUEST_PHRASES[type] || 'supporting people who are in need'}.
 
@@ -62,7 +65,7 @@ Your kindness can bring happiness and ${type === 'Food' ? 'nourishment' : 'hope'
 Thank you for your support.
 
 Warm regards,
-VP Trust`;
+{{organization_name}}`, {}, organizationNames);
 
   const initialType = normalizeDonationType(request?.type);
 
@@ -85,6 +88,12 @@ VP Trust`;
 
   const set = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
   const isFood = form.type === 'Food';
+
+  // Refresh the suggested message once the organization's names load, unless already edited.
+  useEffect(() => {
+    if (!messageEdited) setForm((f) => ({ ...f, message: buildMessage(f.type) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationNames]);
 
   // Keep the suggested message in step with the type until the collector edits it by hand.
   function setType(type: string) {

@@ -13,8 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/lib/supabase/client';
 import { TEMPLATE_TYPES } from '@/lib/constants';
+import { formatOrganizationName } from '@/lib/organization';
+import { ORGANIZATION_SIGN_OFF, renderTemplate } from '@/lib/templates';
+import { useOrganizationNames } from '@/lib/use-organization-names';
 import type { MessageTemplate } from '@/lib/types';
 
 export default function TemplatesPage() {
@@ -23,6 +27,7 @@ export default function TemplatesPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', type: 'Birthday Wish', subject: '', body: '', is_approved: false });
   const [busy, setBusy] = useState(false);
+  const organizationNames = useOrganizationNames();
 
   const load = async () => {
     const { data } = await supabase.from('message_templates').select('*').order('type');
@@ -39,7 +44,9 @@ export default function TemplatesPage() {
 
   function openNew() {
     setEditing(null);
-    setForm({ name: '', type: 'Birthday Wish', subject: '', body: '', is_approved: false });
+    setForm({ name: '', type: 'Birthday Wish', subject: '', body: `
+
+${ORGANIZATION_SIGN_OFF}`, is_approved: false });
     setShowForm(true);
   }
 
@@ -80,9 +87,18 @@ export default function TemplatesPage() {
 
         <div className="p-3 rounded-lg bg-muted text-sm">
           <span className="font-medium">Available variables: </span>
-          {VARIABLES.map((v) => (
-            <code key={v} className="mx-1 px-1.5 py-0.5 bg-background rounded text-xs">{v}</code>
-          ))}
+          <TooltipProvider delayDuration={150}>
+            {VARIABLES.map((v) => v === '{{organization_name}}' ? (
+              <Tooltip key={v}>
+                <TooltipTrigger asChild>
+                  <code tabIndex={0} className="mx-1 px-1.5 py-0.5 bg-background rounded text-xs cursor-help">{v}</code>
+                </TooltipTrigger>
+                <TooltipContent className="whitespace-pre-line">{formatOrganizationName(organizationNames)}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <code key={v} className="mx-1 px-1.5 py-0.5 bg-background rounded text-xs">{v}</code>
+            ))}
+          </TooltipProvider>
         </div>
 
         <div className="grid gap-3">
@@ -99,7 +115,7 @@ export default function TemplatesPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{t.body}</p>
+                  <p className="text-sm text-muted-foreground mt-1 whitespace-pre-line">{renderTemplate(t, {}, organizationNames)}</p>
                   {t.variables.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {t.variables.map((v) => (
@@ -144,6 +160,12 @@ export default function TemplatesPage() {
                   <Label>Message Body</Label>
                   <Textarea value={form.body} onChange={(e) => set('body', e.target.value)} rows={8} placeholder="Use {{sponsor_name}}, {{organization_name}}, etc." className="font-mono text-sm" />
                 </div>
+                {form.body.trim() && (
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label>Preview</Label>
+                    <div className="rounded-md border bg-muted/50 p-3 text-sm whitespace-pre-line">{renderTemplate(form.body, {}, organizationNames)}</div>
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Switch id="approved" checked={form.is_approved} onCheckedChange={(v) => set('is_approved', v)} />

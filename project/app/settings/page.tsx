@@ -12,11 +12,17 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/lib/supabase/client';
+import { useAuth } from '@/lib/auth-context';
 import { REMINDER_INTERVAL_OPTIONS } from '@/lib/constants';
+import { organizationNamesFrom } from '@/lib/organization';
 import type { OrganizationSettings } from '@/lib/types';
 
 export default function SettingsPage() {
+  const { appUser } = useAuth();
+  const isAdmin = appUser?.role === 'admin';
   const [org, setOrg] = useState<OrganizationSettings | null>(null);
+  const [names, setNames] = useState(organizationNamesFrom(null));
+  const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', city: '', state: '', timezone: 'Asia/Kolkata', currency: 'INR' });
   const [intervals, setIntervals] = useState<number[]>([7, 3, 1, 0]);
   const [busy, setBusy] = useState(false);
@@ -38,6 +44,7 @@ export default function SettingsPage() {
           currency: data.currency || 'INR',
         });
         setIntervals(data.reminder_intervals || [7, 3, 1, 0]);
+        setNames(organizationNamesFrom(data));
       }
     })();
   }, []);
@@ -51,14 +58,25 @@ export default function SettingsPage() {
   }
 
   async function save() {
-    setBusy(true);
-    const payload = { ...form, reminder_intervals: intervals };
-    if (org) {
-      await supabase.from('organization_settings').update(payload).eq('id', org.id);
-    } else {
-      await supabase.from('organization_settings').insert(payload);
+    setBusy(true); setError('');
+    const orgNames = { org_name_en: names.org_name_en.trim(), org_name_ta: names.org_name_ta.trim() };
+    // `name` follows the English name so older code reading it stays in step.
+    const payload = { ...form, ...orgNames, name: orgNames.org_name_en || form.name, reminder_intervals: intervals };
+    const run = (p: Record<string, unknown>) => org
+      ? supabase.from('organization_settings').update(p).eq('id', org.id)
+      : supabase.from('organization_settings').insert(p);
+    const { error: err } = await run(payload);
+    let message = err ? err.message || 'Unable to save settings.' : '';
+    if (err?.code === 'PGRST204' && err.message.includes('org_name_')) {
+      // Migration 00009 hasn't been applied yet: save everything else.
+      const { org_name_en: _en, org_name_ta: _ta, ...rest } = payload;
+      const { error: retryErr } = await run(rest);
+      message = retryErr
+        ? retryErr.message || 'Unable to save settings.'
+        : 'Other settings saved, but the organization names need database migration 00009 before they can be saved.';
     }
     setBusy(false);
+    if (message) { setError(message); return; }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -81,12 +99,26 @@ export default function SettingsPage() {
         <PushNotificationsCard />
 
         <Card className="p-5 space-y-4">
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Organization Details</h3>
+          <p className="text-sm text-muted-foreground">
+            Used for {'{{organization_name}}'} in every message template: English on the first line, Tamil on the second.
+          </p>
+          <div className="grid gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="org-name-en">Organization Name (English)</Label>
+              <Input id="org-name-en" value={names.org_name_en} onChange={(e) => setNames((n) => ({ ...n, org_name_en: e.target.value }))} disabled={!isAdmin} placeholder="VP TRUST" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="org-name-ta">Organization Name (Tamil)</Label>
+              <Input id="org-name-ta" lang="ta" value={names.org_name_ta} onChange={(e) => setNames((n) => ({ ...n, org_name_ta: e.target.value }))} disabled={!isAdmin} placeholder="வள்ளலார் பசியாற்றுமையம் அறக்கட்டளை" />
+            </div>
+            {!isAdmin && <p className="text-xs text-muted-foreground">Only an admin can change the organization names.</p>}
+          </div>
+        </Card>
+
+        <Card className="p-5 space-y-4">
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Organization</h3>
           <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Organization Name</Label>
-              <Input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Your organization name" />
-            </div>
             <div className="space-y-1.5">
               <Label>Phone</Label>
               <Input value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+91 98765 43210" />
@@ -135,6 +167,7 @@ export default function SettingsPage() {
           </div>
         </Card>
 
+        {error && <p className="text-sm text-destructive">{error}</p>}
         <Button onClick={save} disabled={busy} className="w-full sm:w-auto">
           <Save className="h-4 w-4 mr-2" />
           {busy ? 'Saving...' : saved ? 'Saved!' : 'Save Settings'}

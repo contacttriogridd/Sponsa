@@ -1,7 +1,9 @@
 import { supabase } from '@/lib/supabase/client';
 import type { MessageTemplate, Sponsor, SpecialOccasion } from '@/lib/types';
 import { DEFAULT_INTERVALS, getDueReminders, toDateKey } from '@/lib/due-reminders';
-import { buildMessageFromTemplate, sendWhatsAppMessage } from '@/lib/whatsapp';
+import { sendWhatsAppMessage } from '@/lib/whatsapp';
+import { organizationNamesFrom } from '@/lib/organization';
+import { renderTemplate } from '@/lib/templates';
 
 /** Maps an occasion to the approved template type used to wish the sponsor. */
 function templateTypeFor(occasion: SpecialOccasion): string | null {
@@ -23,14 +25,14 @@ function templateTypeFor(occasion: SpecialOccasion): string | null {
  */
 export async function runReminderEngine(currentUserId: string): Promise<{ created: number }> {
   const [{ data: org }, { data: occasions }, { data: sponsors }, { data: templates }] = await Promise.all([
-    supabase.from('organization_settings').select('name, reminder_intervals, whatsapp_enabled').limit(1).maybeSingle(),
+    supabase.from('organization_settings').select('*').limit(1).maybeSingle(),
     supabase.from('special_occasions').select('*').eq('active', true),
     supabase.from('sponsors').select('*').eq('status', 'active'),
     supabase.from('message_templates').select('*').eq('is_approved', true),
   ]);
 
   const intervals: number[] = org?.reminder_intervals?.length ? org.reminder_intervals : DEFAULT_INTERVALS;
-  const organizationName = org?.name || 'VP Trust';
+  const organizationNames = organizationNamesFrom(org);
   const templateByType = new Map((templates || []).map((t: MessageTemplate) => [t.type, t]));
   const todayKey = toDateKey(new Date());
   const due = getDueReminders((occasions || []) as SpecialOccasion[], (sponsors || []) as Sponsor[], intervals);
@@ -66,11 +68,10 @@ export async function runReminderEngine(currentUserId: string): Promise<{ create
       const templateType = templateTypeFor(occasion);
       const template = templateType ? templateByType.get(templateType) : null;
       if (org?.whatsapp_enabled && template && sponsor.whatsapp && sponsor.whatsapp_consent) {
-        const body = buildMessageFromTemplate(template, {
+        const body = renderTemplate(template, {
           sponsor_name: sponsor.preferred_name || sponsor.full_name,
           person_name: occasion.person_name,
-          organization_name: organizationName,
-        });
+        }, organizationNames);
         await sendWhatsAppMessage(sponsor, body, template.id, currentUserId);
       }
     }
