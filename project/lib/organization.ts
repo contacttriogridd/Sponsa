@@ -11,7 +11,7 @@ export interface OrganizationNames {
 /** Used until settings load, and on databases that predate migration 00009. */
 export const DEFAULT_ORGANIZATION_NAMES: OrganizationNames = {
   org_name_en: 'VP TRUST',
-  org_name_ta: 'வள்ளலார் பசியாற்றுமையம் அறக்கட்டளை',
+  org_name_ta: 'வள்ளலார் பசியாற்றும் அறக்கட்டளை',
 };
 
 /** Reads the names from an organization_settings row, falling back to the defaults for missing columns. */

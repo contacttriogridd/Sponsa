@@ -110,7 +110,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="org-name-ta">Organization Name (Tamil)</Label>
-              <Input id="org-name-ta" lang="ta" value={names.org_name_ta} onChange={(e) => setNames((n) => ({ ...n, org_name_ta: e.target.value }))} disabled={!isAdmin} placeholder="வள்ளலார் பசியாற்றுமையம் அறக்கட்டளை" />
+              <Input id="org-name-ta" lang="ta" value={names.org_name_ta} onChange={(e) => setNames((n) => ({ ...n, org_name_ta: e.target.value }))} disabled={!isAdmin} placeholder="வள்ளலார் பசியாற்றும் அறக்கட்டளை" />
             </div>
             {!isAdmin && <p className="text-xs text-muted-foreground">Only an admin can change the organization names.</p>}
           </div>
