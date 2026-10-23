@@ -4,6 +4,7 @@ import { DEFAULT_INTERVALS, getDueReminders, toDateKey } from '@/lib/due-reminde
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import { organizationNamesFrom } from '@/lib/organization';
 import { renderTemplate } from '@/lib/templates';
+import { runMonthlySponsorReminders } from '@/lib/monthly-reminder-engine';
 
 /** Maps an occasion to the approved template type used to wish the sponsor. */
 function templateTypeFor(occasion: SpecialOccasion): string | null {
@@ -75,6 +76,12 @@ export async function runReminderEngine(currentUserId: string): Promise<{ create
         await sendWhatsAppMessage(sponsor, body, template.id, currentUserId);
       }
     }
+  }
+
+  try {
+    created += await runMonthlySponsorReminders(currentUserId);
+  } catch {
+    // Monthly sponsor reminders are optional; never let them block occasion reminders.
   }
 
   return { created };

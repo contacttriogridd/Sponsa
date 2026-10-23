@@ -17,6 +17,8 @@ export interface OrganizationSettings {
   /** Added by migration 00009; absent on older databases. */
   org_name_en?: string | null;
   org_name_ta?: string | null;
+  /** Added by migration 00011: days before a star day / payment day to remind. */
+  star_reminder_days?: number | null;
   logo_url: string | null;
   phone: string | null;
   email: string | null;
@@ -236,4 +238,44 @@ export interface UpcomingOccasion {
   nextDate: Date;
   daysUntil: number;
   occurrenceYear: number;
+}
+
+export type MonthlySponsorStatus = 'active' | 'paused' | 'stopped';
+
+export interface MonthlySponsor {
+  id: string;
+  name: string;
+  phone: string | null;
+  dob: string | null;
+  /** Index into RAASIS (lib/natchathiram.ts). */
+  raasi: number | null;
+  /** Index into STARS (lib/natchathiram.ts). */
+  star: number | null;
+  monthly_amount: number | null;
+  payment_day: number | null;
+  start_date: string | null;
+  status: MonthlySponsorStatus;
+  notes: string | null;
+  sponsor_id: string | null;
+  relationship: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PaymentMode = 'Cash' | 'UPI' | 'Bank';
+
+export interface MonthlyPayment {
+  id: string;
+  monthly_sponsor_id: string;
+  /** First day of the month, YYYY-MM-01. */
+  month: string;
+  amount: number | null;
+  status: 'paid' | 'pending';
+  paid_on: string | null;
+  mode: PaymentMode | null;
+  notes: string | null;
+  recorded_by: string | null;
+  created_at: string;
+  updated_at: string;
 }

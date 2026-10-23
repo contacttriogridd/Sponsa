@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, Calendar, Bell, HandHeart, Gift,
-  BarChart3, Settings, Menu, Search, Plus, LogOut, ChevronLeft,
+  BarChart3, Settings, Menu, Search, Plus, LogOut, ChevronLeft, Star,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
@@ -20,12 +20,13 @@ import { NotificationBell } from '@/components/shared/NotificationBell';
 import { runReminderEngineOncePerDay } from '@/lib/reminder-engine';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  LayoutDashboard, Users, Calendar, Bell, HandHeart, Gift, BarChart3, Settings,
+  LayoutDashboard, Users, Calendar, Bell, HandHeart, Gift, BarChart3, Settings, Star,
 };
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
   { label: 'Sponsors', href: '/sponsors', icon: 'Users' },
+  { label: 'Monthly Sponsors', href: '/monthly-sponsors', icon: 'Star' },
   { label: 'Calendar', href: '/calendar', icon: 'Calendar' },
   { label: 'Reminders', href: '/reminders', icon: 'Bell' },
   { label: 'Sponsorships', href: '/sponsorships', icon: 'HandHeart' },

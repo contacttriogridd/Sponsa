@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/constants';
+import { MonthlySponsorsReport } from '@/components/monthly/MonthlySponsorsReport';
 
 interface ReportData {
   totalSponsors: number;
@@ -167,6 +168,8 @@ export default function ReportsPage() {
             })}
           </div>
         )}
+
+        <MonthlySponsorsReport />
 
         <div>
           <h2 className="font-semibold mb-3">Export Data</h2>

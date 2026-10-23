@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { REMINDER_INTERVAL_OPTIONS } from '@/lib/constants';
 import { organizationNamesFrom } from '@/lib/organization';
+import { DEFAULT_STAR_REMINDER_DAYS } from '@/lib/monthly-sponsors';
 import type { OrganizationSettings } from '@/lib/types';
 
 export default function SettingsPage() {
@@ -25,6 +26,7 @@ export default function SettingsPage() {
   const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', city: '', state: '', timezone: 'Asia/Kolkata', currency: 'INR' });
   const [intervals, setIntervals] = useState<number[]>([7, 3, 1, 0]);
+  const [starReminderDays, setStarReminderDays] = useState(String(DEFAULT_STAR_REMINDER_DAYS));
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -45,6 +47,7 @@ export default function SettingsPage() {
         });
         setIntervals(data.reminder_intervals || [7, 3, 1, 0]);
         setNames(organizationNamesFrom(data));
+        setStarReminderDays(String(data.star_reminder_days ?? DEFAULT_STAR_REMINDER_DAYS));
       }
     })();
   }, []);
@@ -61,19 +64,30 @@ export default function SettingsPage() {
     setBusy(true); setError('');
     const orgNames = { org_name_en: names.org_name_en.trim(), org_name_ta: names.org_name_ta.trim() };
     // `name` follows the English name so older code reading it stays in step.
-    const payload = { ...form, ...orgNames, name: orgNames.org_name_en || form.name, reminder_intervals: intervals };
+    const starDays = Math.min(15, Math.max(0, Math.round(Number(starReminderDays) || 0)));
+    let payload: Record<string, unknown> = {
+      ...form, ...orgNames, name: orgNames.org_name_en || form.name, reminder_intervals: intervals, star_reminder_days: starDays,
+    };
     const run = (p: Record<string, unknown>) => org
       ? supabase.from('organization_settings').update(p).eq('id', org.id)
       : supabase.from('organization_settings').insert(p);
-    const { error: err } = await run(payload);
+    // Columns added by later migrations; if one is missing, save everything else.
+    const optional: { columns: string[]; migration: string; what: string }[] = [
+      { columns: ['org_name_en', 'org_name_ta'], migration: '00009', what: 'the organization names' },
+      { columns: ['star_reminder_days'], migration: '00011', what: 'the star day reminder days' },
+    ];
+    const skipped: string[] = [];
+    let { error: err } = await run(payload);
+    while (err?.code === 'PGRST204') {
+      const missing = optional.find((o) => o.columns.some((c) => err!.message.includes(`'${c}'`)) && !skipped.includes(o.what));
+      if (!missing) break;
+      payload = Object.fromEntries(Object.entries(payload).filter(([k]) => !missing.columns.includes(k)));
+      skipped.push(missing.what);
+      ({ error: err } = await run(payload));
+    }
     let message = err ? err.message || 'Unable to save settings.' : '';
-    if (err?.code === 'PGRST204' && err.message.includes('org_name_')) {
-      // Migration 00009 hasn't been applied yet: save everything else.
-      const { org_name_en: _en, org_name_ta: _ta, ...rest } = payload;
-      const { error: retryErr } = await run(rest);
-      message = retryErr
-        ? retryErr.message || 'Unable to save settings.'
-        : 'Other settings saved, but the organization names need database migration 00009 before they can be saved.';
+    if (!err && skipped.length) {
+      message = `Other settings saved, but ${skipped.join(' and ')} need database migrations ${optional.filter((o) => skipped.includes(o.what)).map((o) => o.migration).join(' and ')} first.`;
     }
     setBusy(false);
     if (message) { setError(message); return; }
@@ -164,6 +178,17 @@ export default function SettingsPage() {
                 <Label htmlFor={`interval-${opt.value}`} className="cursor-pointer">{opt.label}</Label>
               </div>
             ))}
+          </div>
+        </Card>
+
+        <Card className="p-5 space-y-4">
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Star Day Reminders</h3>
+          <p className="text-sm text-muted-foreground">
+            Monthly sponsors&apos; star days (நட்சத்திர நாள்) and payment days are reminded this many days before, and on the day.
+          </p>
+          <div className="space-y-1.5 max-w-[12rem]">
+            <Label htmlFor="star-reminder-days">Days before</Label>
+            <Input id="star-reminder-days" type="number" min="0" max="15" inputMode="numeric" value={starReminderDays} onChange={(e) => setStarReminderDays(e.target.value)} />
           </div>
         </Card>
 

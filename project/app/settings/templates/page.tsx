@@ -67,7 +67,7 @@ ${ORGANIZATION_SIGN_OFF}`, is_approved: false });
 
   const set = (key: string, value: string | boolean) => setForm((f) => ({ ...f, [key]: value }));
 
-  const VARIABLES = ['{{sponsor_name}}', '{{person_name}}', '{{occasion}}', '{{organization_name}}', '{{date}}'];
+  const VARIABLES = ['{{sponsor_name}}', '{{person_name}}', '{{occasion}}', '{{organization_name}}', '{{date}}', '{{star_name}}', '{{raasi_name}}', '{{star_date}}', '{{monthly_amount}}'];
 
   return (
     <AppLayout>

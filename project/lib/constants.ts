@@ -120,6 +120,7 @@ export const TEMPLATE_TYPES = [
   'Sponsorship Request',
   'Thank You',
   'Follow-up',
+  'Star Day Wish',
 ] as const;
 
 export const NAV_ITEMS = [
