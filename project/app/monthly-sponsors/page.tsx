@@ -21,7 +21,7 @@ import {
 } from '@/lib/monthly-sponsors';
 import { addDays } from '@/lib/star-days';
 import { loadStarCalendar } from '@/lib/star-calendar-store';
-import { useStarWish } from '@/lib/star-wish';
+import { openMonthlySponsorDrawer, useDrawerDataChanged } from '@/lib/drawer-store';
 import type { MonthlyPayment, MonthlySponsor } from '@/lib/types';
 
 type Row = MonthlySponsor & { sponsors?: { full_name: string } | null };
@@ -39,7 +39,6 @@ export default function MonthlySponsorsPage() {
   const [editing, setEditing] = useState<Row | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [paying, setPaying] = useState<Row | null>(null);
-  const buildWish = useStarWish();
 
   const loadSponsors = useCallback(async () => {
     const { data, error } = await supabase.from('monthly_sponsors').select('*, sponsors(full_name)').order('name');
@@ -61,6 +60,8 @@ export default function MonthlySponsorsPage() {
 
   useEffect(() => { loadSponsors(); }, [loadSponsors]);
   useEffect(() => { loadPayments(); }, [loadPayments]);
+  const reloadAll = useCallback(() => { loadSponsors(); loadPayments(); }, [loadSponsors, loadPayments]);
+  useDrawerDataChanged(reloadAll);
 
   const paymentBySponsor = useMemo(() => new Map(payments.map((p) => [p.monthly_sponsor_id, p])), [payments]);
 
@@ -150,12 +151,12 @@ export default function MonthlySponsorsPage() {
                     <Card key={s.id} className="p-4">
                       <div className="flex flex-col lg:flex-row lg:items-center gap-3">
                         <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                          <button type="button" aria-label={`Open ${s.name}`} onClick={() => openMonthlySponsorDrawer(s.id)} className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
                             <Star className="h-5 w-5" />
-                          </div>
+                          </button>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold">{s.name}</span>
+                              <button type="button" onClick={() => openMonthlySponsorDrawer(s.id)} className="font-semibold hover:text-primary text-left">{s.name}</button>
                               {s.status !== 'active' && <Badge variant="outline">{MONTHLY_STATUS_LABELS[s.status]}</Badge>}
                               {!isValidCombination(s.raasi, s.star) && (
                                 <Badge variant="outline" className="text-warning border-warning/40"><AlertTriangle className="h-3 w-3 mr-1" />Check Raasi/Star</Badge>
@@ -190,7 +191,7 @@ export default function MonthlySponsorsPage() {
                           <Button variant="outline" size="sm" onClick={() => setPaying(s)}>
                             {payment?.status === 'paid' ? 'Edit payment' : 'Mark paid'}
                           </Button>
-                          {next && <SendWishButton href={buildWish(s, next.occurrence.date).url} />}
+                          {next && <SendWishButton sponsor={s} starDate={next.occurrence.date} />}
                           <Button variant="ghost" size="icon" aria-label={`Edit ${s.name}`} onClick={() => { setEditing(s); setShowForm(true); }}>
                             <Edit className="h-4 w-4" />
                           </Button>

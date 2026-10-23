@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     ? due.map((r) => ({
         title: r.title,
         body: r.message,
-        url: `/sponsors/${r.sponsor.id}`,
+        url: `/dashboard?sponsor=${r.sponsor.id}&occasion=${r.occasion.id}`,
         tag: `occasion-${r.occasion.id}-${r.daysBefore}`,
       }))
     : [{

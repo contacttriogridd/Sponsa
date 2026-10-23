@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/sheet';
 import { NotificationBell } from '@/components/shared/NotificationBell';
 import { runReminderEngineOncePerDay } from '@/lib/reminder-engine';
+import { DrawerHost } from '@/components/shared/DrawerHost';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard, Users, Calendar, Bell, HandHeart, Gift, BarChart3, Settings, Star,
@@ -201,6 +202,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             {children}
           </div>
         </main>
+        <DrawerHost />
 
         {/* Mobile Bottom Nav */}
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-card border-t border-border flex items-center justify-around px-2 z-50">

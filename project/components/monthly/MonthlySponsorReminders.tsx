@@ -15,7 +15,7 @@ import {
 } from '@/lib/monthly-sponsors';
 import { addDays } from '@/lib/star-days';
 import { loadStarCalendar } from '@/lib/star-calendar-store';
-import { useStarWish } from '@/lib/star-wish';
+import { openMonthlySponsorDrawer } from '@/lib/drawer-store';
 import type { MonthlyPayment, MonthlySponsor } from '@/lib/types';
 
 /**
@@ -25,7 +25,6 @@ import type { MonthlyPayment, MonthlySponsor } from '@/lib/types';
 export function MonthlySponsorReminders() {
   const [starDays, setStarDays] = useState<UpcomingStarDay[]>([]);
   const [dues, setDues] = useState<PaymentDue[]>([]);
-  const buildWish = useStarWish();
 
   useEffect(() => {
     (async () => {
@@ -57,7 +56,7 @@ export function MonthlySponsorReminders() {
             <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-xl">⭐</div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold">{u.sponsor.name}&apos;s star day</h3>
+                <button type="button" onClick={() => openMonthlySponsorDrawer(u.sponsor.id)} className="font-semibold hover:text-primary text-left">{u.sponsor.name}&apos;s star day</button>
                 <Badge variant={u.daysUntil <= 1 ? 'destructive' : 'secondary'}>{whenLabel(u.daysUntil)}</Badge>
               </div>
               <p className="text-sm text-muted-foreground mt-1">{STARS[u.sponsor.star!].ta} ({STARS[u.sponsor.star!].en}) · {formatStarDate(u.occurrence.date)}</p>
@@ -65,7 +64,7 @@ export function MonthlySponsorReminders() {
             </div>
             <div className="hidden sm:flex gap-2">
               {u.sponsor.phone && <a href={`tel:${u.sponsor.phone}`}><Button variant="outline" size="icon"><Phone className="h-4 w-4" /></Button></a>}
-              <SendWishButton href={buildWish(u.sponsor, u.occurrence.date).url} size="default" />
+              <SendWishButton sponsor={u.sponsor} starDate={u.occurrence.date} size="default" />
             </div>
           </div>
         </Card>
@@ -76,7 +75,7 @@ export function MonthlySponsorReminders() {
             <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-xl">💰</div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold">Monthly payment due — {d.sponsor.name}</h3>
+                <button type="button" onClick={() => openMonthlySponsorDrawer(d.sponsor.id)} className="font-semibold hover:text-primary text-left">Monthly payment due — {d.sponsor.name}</button>
                 <Badge variant={d.daysUntil <= 0 ? 'destructive' : 'secondary'}>{whenLabel(d.daysUntil)}</Badge>
               </div>
               <p className="text-sm text-muted-foreground mt-1">

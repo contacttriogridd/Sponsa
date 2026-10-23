@@ -9,13 +9,12 @@ import { STARS } from '@/lib/natchathiram';
 import { formatStarDate, todayIst, upcomingStarDays, whenLabel, type UpcomingStarDay } from '@/lib/monthly-sponsors';
 import { addDays } from '@/lib/star-days';
 import { loadStarCalendar } from '@/lib/star-calendar-store';
-import { useStarWish } from '@/lib/star-wish';
+import { openMonthlySponsorDrawer } from '@/lib/drawer-store';
 import type { MonthlySponsor } from '@/lib/types';
 
 /** Dashboard card: monthly sponsors whose star day falls in the next 7 days. */
 export function StarDaysThisWeekCard() {
   const [items, setItems] = useState<UpcomingStarDay[] | null>(null);
-  const buildWish = useStarWish();
 
   useEffect(() => {
     (async () => {
@@ -43,12 +42,12 @@ export function StarDaysThisWeekCard() {
           <div key={`${u.sponsor.id}-${u.occurrence.date}`} className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors">
             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-lg">⭐</div>
             <div className="flex-1 min-w-0">
-              <div className="font-medium truncate">{u.sponsor.name}</div>
+              <button type="button" onClick={() => openMonthlySponsorDrawer(u.sponsor.id)} className="font-medium truncate hover:text-primary text-left block max-w-full">{u.sponsor.name}</button>
               <div className="text-sm text-muted-foreground truncate">
                 {STARS[u.sponsor.star!].ta} ({STARS[u.sponsor.star!].en}) · {formatStarDate(u.occurrence.date)} · {whenLabel(u.daysUntil)}
               </div>
             </div>
-            <div className="hidden sm:block"><SendWishButton href={buildWish(u.sponsor, u.occurrence.date).url} /></div>
+            <div className="hidden sm:block"><SendWishButton sponsor={u.sponsor} starDate={u.occurrence.date} /></div>
           </div>
         ))}
         {items && items.length === 0 && <div className="py-6 text-center text-muted-foreground">No star days this week.</div>}

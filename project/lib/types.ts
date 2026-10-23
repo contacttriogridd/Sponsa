@@ -258,6 +258,10 @@ export interface MonthlySponsor {
   notes: string | null;
   sponsor_id: string | null;
   relationship: string | null;
+  /** Added by migration 00012. */
+  address?: string | null;
+  /** Preferred payment mode; added by migration 00012. */
+  payment_mode?: PaymentMode | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -278,4 +282,15 @@ export interface MonthlyPayment {
   recorded_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface MonthlyWishLog {
+  id: string;
+  monthly_sponsor_id: string;
+  star_date: string | null;
+  template_type: string | null;
+  channel: 'whatsapp' | 'copy';
+  message: string;
+  sent_by: string | null;
+  sent_at: string;
 }

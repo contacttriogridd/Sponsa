@@ -8,7 +8,8 @@ export type TemplateData = Record<string, string | null | undefined>;
 /**
  * Fills in a template's {{variables}}. This is the one place variables are
  * replaced, so previews, WhatsApp messages and reminders all read the same.
- * {{organization_name}} always comes from the organization settings; any other
+ * {{organization_name}} (English and Tamil on two lines), {{organization_name_english}}
+ * and {{organization_name_tamil}} always come from the organization settings; any other
  * variable without a value is left as-is (e.g. "{{sponsor_name}}" in a preview).
  */
 export function renderTemplate(
@@ -17,7 +18,12 @@ export function renderTemplate(
   organization: OrganizationNames
 ): string {
   const body = typeof template === 'string' ? template : template.body;
-  const values: TemplateData = { ...data, organization_name: formatOrganizationName(organization) };
+  const values: TemplateData = {
+    ...data,
+    organization_name: formatOrganizationName(organization),
+    organization_name_english: organization.org_name_en,
+    organization_name_tamil: organization.org_name_ta,
+  };
   return body
     .replace(/\r\n?/g, '\n')
     .replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) => values[key] ?? match);

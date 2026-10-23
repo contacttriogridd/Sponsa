@@ -21,9 +21,11 @@ import { SponsorFamilyDays, type FamilyDayDraft } from './SponsorFamilyDays';
 interface SponsorFormProps {
   sponsor?: Sponsor;
   onSaved?: (sponsor: Sponsor) => void;
+  /** Cancel action; defaults to going back a page. */
+  onCancel?: () => void;
 }
 
-export function SponsorForm({ sponsor, onSaved }: SponsorFormProps) {
+export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
   const router = useRouter();
   const { appUser } = useAuth();
   const isEdit = !!sponsor;
@@ -324,7 +326,7 @@ export function SponsorForm({ sponsor, onSaved }: SponsorFormProps) {
           {busy ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Sponsor'}
         </Button>
         )}
-        <Button variant="outline" onClick={() => router.back()}>
+        <Button variant="outline" onClick={() => (onCancel ? onCancel() : router.back())}>
           <X className="h-4 w-4 mr-2" />
           Cancel
         </Button>

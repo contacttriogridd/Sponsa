@@ -121,6 +121,8 @@ export const TEMPLATE_TYPES = [
   'Thank You',
   'Follow-up',
   'Star Day Wish',
+  'Star Day Upcoming',
+  'Star Day Today',
 ] as const;
 
 export const NAV_ITEMS = [

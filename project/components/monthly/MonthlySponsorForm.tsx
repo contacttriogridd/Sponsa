@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { RAASIS, STARS, astroLabel, isValidCombination, padamNote, raasisOfStar, starsInRaasi } from '@/lib/natchathiram';
 import { MONTHLY_STATUS_LABELS } from '@/lib/monthly-sponsors';
-import type { MonthlySponsor, MonthlySponsorStatus } from '@/lib/types';
+import type { MonthlySponsor, MonthlySponsorStatus, PaymentMode } from '@/lib/types';
 
 interface SponsorOption { id: string; full_name: string }
 
@@ -24,6 +24,8 @@ interface MonthlySponsorFormProps {
 }
 
 const NO_SPONSOR = 'none';
+const NO_MODE = 'none';
+const PAYMENT_MODES: PaymentMode[] = ['Cash', 'UPI', 'Bank'];
 
 export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponsorFormProps) {
   const { appUser } = useAuth();
@@ -31,6 +33,8 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
   const [form, setForm] = useState({
     name: sponsor?.name || '',
     phone: sponsor?.phone || '',
+    address: sponsor?.address || '',
+    payment_mode: (sponsor?.payment_mode || NO_MODE) as string,
     dob: sponsor?.dob || '',
     raasi: sponsor?.raasi ?? null as number | null,
     star: sponsor?.star ?? null as number | null,
@@ -88,9 +92,15 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
       sponsor_id: form.sponsor_id === NO_SPONSOR ? null : form.sponsor_id,
       relationship: form.sponsor_id === NO_SPONSOR ? null : form.relationship.trim() || null,
     };
-    const { data, error: err } = sponsor
-      ? await supabase.from('monthly_sponsors').update(payload).eq('id', sponsor.id).select().single()
-      : await supabase.from('monthly_sponsors').insert({ ...payload, created_by: appUser?.id || null }).select().single();
+    const run = (p: Record<string, unknown>) => sponsor
+      ? supabase.from('monthly_sponsors').update(p).eq('id', sponsor.id).select().single()
+      : supabase.from('monthly_sponsors').insert({ ...p, created_by: appUser?.id || null }).select().single();
+    const full = { ...payload, address: form.address.trim() || null, payment_mode: form.payment_mode === NO_MODE ? null : form.payment_mode };
+    let { data, error: err } = await run(full);
+    if (err?.code === 'PGRST204' && /'(address|payment_mode)'/.test(err.message)) {
+      // Migration 00012 not applied yet: save without address / payment mode.
+      ({ data, error: err } = await run(payload));
+    }
     setBusy(false);
     if (err) { setError('Unable to save. Please try again.'); return; }
     onSaved(data as MonthlySponsor);
@@ -146,6 +156,16 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
           <Input id="ms-day" type="number" min="1" max="31" inputMode="numeric" value={form.payment_day} onChange={(e) => set('payment_day', e.target.value)} placeholder="Optional, 1–31" />
         </div>
         <div className="space-y-1.5">
+          <Label>Preferred payment mode</Label>
+          <Select value={form.payment_mode} onValueChange={(v) => set('payment_mode', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_MODE}>Not set</SelectItem>
+              {PAYMENT_MODES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
           <Label>Start date</Label>
           <DatePicker value={form.start_date} onChange={(v) => set('start_date', v)} fromYear={2000} toYear={new Date().getFullYear() + 1} />
         </div>
@@ -176,6 +196,10 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
             <Input id="ms-rel" value={form.relationship} onChange={(e) => set('relationship', e.target.value)} placeholder="e.g. Son, Daughter" />
           </div>
         )}
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="ms-address">Address</Label>
+          <Textarea id="ms-address" value={form.address} onChange={(e) => set('address', e.target.value)} rows={2} placeholder="Address (optional)" />
+        </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="ms-notes">Notes</Label>
           <Textarea id="ms-notes" value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={2} placeholder="Any notes..." />

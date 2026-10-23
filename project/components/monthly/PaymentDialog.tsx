@@ -39,7 +39,7 @@ export function PaymentDialog({ sponsor, month, payment, onOpenChange, onSaved }
     setStatus(payment?.status === 'pending' ? 'pending' : 'paid');
     setAmount(String(payment?.amount ?? sponsor.monthly_amount ?? ''));
     setPaidOn(payment?.paid_on || todayIst());
-    setMode(payment?.mode || 'Cash');
+    setMode(payment?.mode || sponsor.payment_mode || 'Cash');
     setError('');
   }, [sponsor, payment]);
 

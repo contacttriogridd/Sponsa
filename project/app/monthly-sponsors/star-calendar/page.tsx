@@ -15,7 +15,7 @@ import { STARS, RAASIS, astroLabel } from '@/lib/natchathiram';
 import { effectiveRaasi, formatIstTime, formatStarDate, todayIst, upcomingStarDays, whenLabel, type UpcomingStarDay } from '@/lib/monthly-sponsors';
 import { addDays, type StarCalendarDay } from '@/lib/star-days';
 import { loadStarCalendar } from '@/lib/star-calendar-store';
-import { useStarWish } from '@/lib/star-wish';
+import { openMonthlySponsorDrawer } from '@/lib/drawer-store';
 import { cn } from '@/lib/utils';
 import type { MonthlySponsor } from '@/lib/types';
 
@@ -37,7 +37,6 @@ export default function StarCalendarPage() {
   const [upcoming, setUpcoming] = useState<UpcomingStarDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
-  const buildWish = useStarWish();
 
   const first = `${year}-${String(month + 1).padStart(2, '0')}-01`;
   const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
@@ -170,7 +169,7 @@ export default function StarCalendarPage() {
           <TabsContent value="upcoming" className="mt-4">
             <div className="grid gap-3">
               {upcoming.map((u) => (
-                <UpcomingCard key={`${u.sponsor.id}-${u.occurrence.date}`} item={u} wishUrl={buildWish(u.sponsor, u.occurrence.date).url} />
+                <UpcomingCard key={`${u.sponsor.id}-${u.occurrence.date}`} item={u} />
               ))}
               {upcoming.length === 0 && (
                 <Card className="py-14 text-center">
@@ -209,13 +208,13 @@ export default function StarCalendarPage() {
               {selectedSponsors.map((u) => (
                 <div key={u.sponsor.id} className="flex items-center gap-3 p-3 rounded-xl border border-border">
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{u.sponsor.name}</div>
+                    <button type="button" onClick={() => { setSelected(null); openMonthlySponsorDrawer(u.sponsor.id); }} className="font-medium truncate hover:text-primary text-left">{u.sponsor.name}</button>
                     <div className="text-xs text-muted-foreground">{astroLabel(STARS[u.sponsor.star!])}</div>
                     {u.sponsor.phone && (
                       <a href={`tel:${u.sponsor.phone}`} className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{u.sponsor.phone}</a>
                     )}
                   </div>
-                  <SendWishButton href={buildWish(u.sponsor, u.occurrence.date).url} />
+                  <SendWishButton sponsor={u.sponsor} starDate={u.occurrence.date} />
                 </div>
               ))}
               {selectedSponsors.length === 0 && <p className="text-sm text-muted-foreground">No monthly sponsor has this star day.</p>}
@@ -227,7 +226,7 @@ export default function StarCalendarPage() {
   );
 }
 
-function UpcomingCard({ item, wishUrl }: { item: UpcomingStarDay; wishUrl: string }) {
+function UpcomingCard({ item }: { item: UpcomingStarDay }) {
   const { sponsor, occurrence, daysUntil } = item;
   const raasi = effectiveRaasi(sponsor);
   return (
@@ -239,7 +238,7 @@ function UpcomingCard({ item, wishUrl }: { item: UpcomingStarDay; wishUrl: strin
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-semibold">{sponsor.name}</h3>
+            <button type="button" onClick={() => openMonthlySponsorDrawer(sponsor.id)} className="font-semibold hover:text-primary text-left">{sponsor.name}</button>
             <Badge variant={daysUntil <= 1 ? 'destructive' : 'secondary'}>{whenLabel(daysUntil)}</Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -254,7 +253,7 @@ function UpcomingCard({ item, wishUrl }: { item: UpcomingStarDay; wishUrl: strin
           {sponsor.phone && (
             <a href={`tel:${sponsor.phone}`}><Button variant="outline" size="icon" aria-label={`Call ${sponsor.name}`}><Phone className="h-4 w-4" /></Button></a>
           )}
-          <SendWishButton href={wishUrl} />
+          <SendWishButton sponsor={sponsor} starDate={occurrence.date} />
         </div>
       </div>
     </Card>

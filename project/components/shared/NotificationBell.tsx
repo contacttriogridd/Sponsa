@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { openSponsorDrawer } from '@/lib/drawer-store';
 import { formatDistanceToNow } from 'date-fns';
 
 export function NotificationBell() {
@@ -80,7 +81,10 @@ export function NotificationBell() {
               {notifications.map((n) => (
                 <button
                   key={n.id}
-                  onClick={() => markAsRead(n.id)}
+                  onClick={() => {
+                    markAsRead(n.id);
+                    if (n.sponsor_id) { setOpen(false); openSponsorDrawer(n.sponsor_id, { occasionId: n.occasion_id || undefined }); }
+                  }}
                   className={cn(
                     'w-full text-left p-3 rounded-lg transition-colors hover:bg-muted',
                     !n.is_read && 'bg-primary/5'
