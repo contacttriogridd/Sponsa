@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Phone, MessageCircle, Mail, Edit, ArrowLeft, Plus, Trash2,
-  Gift, Users, CalendarDays, HandHeart, Archive, RotateCcw
+  Gift, Users, CalendarDays, HandHeart, Archive, RotateCcw, Heart
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
@@ -29,6 +29,9 @@ import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { DeleteSponsorDialog } from '@/components/shared/DeleteSponsorDialog';
 import { DeleteRecordDialog, type DeletableRecord } from '@/components/shared/DeleteRecordDialog';
 import { useAuth } from '@/lib/auth-context';
+import { toast } from 'sonner';
+import { ThankYouDialog } from '@/components/shared/ThankYouDialog';
+import { THANK_YOU_CHANNEL_LABELS } from '@/lib/thank-you';
 
 type DialogType = 'edit' | 'addFamily' | 'editFamily' | 'addOccasion' | 'editOccasion' | 'addDonation' | 'addSponsorship' | null;
 
@@ -47,6 +50,7 @@ export default function SponsorDetailPage() {
   const [deletingRecord, setDeletingRecord] = useState<DeletableRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialog, setDialog] = useState<DialogType>(null);
+  const [thankingDonation, setThankingDonation] = useState<Donation | null>(null);
   const [editingFamily, setEditingFamily] = useState<FamilyMember | null>(null);
   const [editingOccasion, setEditingOccasion] = useState<SpecialOccasion | null>(null);
 
@@ -464,6 +468,20 @@ export default function SponsorDetailPage() {
                         <div className="font-semibold">{formatCurrency(Number(d.amount))}</div>
                         {d.donation_id && <div className="text-xs text-muted-foreground">{d.donation_id}</div>}
                       </div>
+                      {d.thank_you_sent ? (
+                        <Badge
+                          variant="outline"
+                          className="ml-2 text-success border-success/30 bg-success/10 whitespace-nowrap cursor-pointer"
+                          title={`${d.thank_you_sent_at ? `Sent ${formatDate(d.thank_you_sent_at)}. ` : ''}Click to send again`}
+                          onClick={() => setThankingDonation(d)}
+                        >
+                          Thanked ✓{d.thank_you_channel ? ` via ${THANK_YOU_CHANNEL_LABELS[d.thank_you_channel]}` : ''}
+                        </Badge>
+                      ) : (
+                        <Button variant="outline" size="sm" className="ml-2" onClick={() => setThankingDonation(d)}>
+                          <Heart className="h-3.5 w-3.5 mr-1.5" />Send Thanks
+                        </Button>
+                      )}
                       {appUser?.role === 'admin' && (
                         <Button variant="ghost" size="icon" className="text-destructive" aria-label="Delete donation"
                           onClick={() => setDeletingRecord({
@@ -534,11 +552,30 @@ export default function SponsorDetailPage() {
             <DonationForm
               sponsorId={id}
               sponsorName={sponsor.full_name}
-              onSaved={(d) => { setDonations((prev) => [d, ...prev]); setDialog(null); load(); }}
+              onSaved={(d) => {
+                setDonations((prev) => [d, ...prev]);
+                setDialog(null);
+                load();
+                // Saved successfully: confirm, then offer the thank-you message.
+                toast.success('Donation recorded');
+                setTimeout(() => setThankingDonation(d), 400);
+              }}
               onCancel={() => setDialog(null)}
             />
           </DialogContent>
         </Dialog>
+
+        <ThankYouDialog
+          sponsor={sponsor}
+          donation={thankingDonation}
+          onOpenChange={(o) => { if (!o) setThankingDonation(null); }}
+          onSent={(updated, channel) => {
+            setDonations((prev) => prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)));
+            setSponsor((prev) => (prev ? { ...prev, last_contact_date: new Date().toISOString().split('T')[0] } : prev));
+            if (channel !== 'copy') toast.success(`Thank-you sent via ${THANK_YOU_CHANNEL_LABELS[channel]}`);
+            load();
+          }}
+        />
 
         <Dialog open={dialog === 'addSponsorship'} onOpenChange={(o) => !o && setDialog(null)}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

@@ -19,6 +19,9 @@ export interface OrganizationSettings {
   org_name_ta?: string | null;
   /** Added by migration 00011: days before a star day / payment day to remind. */
   star_reminder_days?: number | null;
+  /** Thank-you message templates; added by migration 00013 (null = default text). */
+  thank_you_template_en?: string | null;
+  thank_you_template_ta?: string | null;
   logo_url: string | null;
   phone: string | null;
   email: string | null;
@@ -157,6 +160,10 @@ export interface Donation {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** Thank-you tracking; added by migration 00013. */
+  thank_you_sent?: boolean | null;
+  thank_you_sent_at?: string | null;
+  thank_you_channel?: 'whatsapp' | 'sms' | 'email' | 'copy' | null;
 }
 
 export interface Interaction {

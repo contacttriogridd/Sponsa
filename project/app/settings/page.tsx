@@ -16,6 +16,7 @@ import { useAuth } from '@/lib/auth-context';
 import { REMINDER_INTERVAL_OPTIONS } from '@/lib/constants';
 import { organizationNamesFrom } from '@/lib/organization';
 import { DEFAULT_STAR_REMINDER_DAYS } from '@/lib/monthly-sponsors';
+import { DEFAULT_THANK_YOU_EN, DEFAULT_THANK_YOU_TA, thankYouTemplatesFrom } from '@/lib/thank-you';
 import type { OrganizationSettings } from '@/lib/types';
 
 export default function SettingsPage() {
@@ -27,6 +28,7 @@ export default function SettingsPage() {
   const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', city: '', state: '', timezone: 'Asia/Kolkata', currency: 'INR' });
   const [intervals, setIntervals] = useState<number[]>([7, 3, 1, 0]);
   const [starReminderDays, setStarReminderDays] = useState(String(DEFAULT_STAR_REMINDER_DAYS));
+  const [thankYou, setThankYou] = useState(thankYouTemplatesFrom(null));
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -48,6 +50,7 @@ export default function SettingsPage() {
         setIntervals(data.reminder_intervals || [7, 3, 1, 0]);
         setNames(organizationNamesFrom(data));
         setStarReminderDays(String(data.star_reminder_days ?? DEFAULT_STAR_REMINDER_DAYS));
+        setThankYou(thankYouTemplatesFrom(data));
       }
     })();
   }, []);
@@ -67,6 +70,9 @@ export default function SettingsPage() {
     const starDays = Math.min(15, Math.max(0, Math.round(Number(starReminderDays) || 0)));
     let payload: Record<string, unknown> = {
       ...form, ...orgNames, name: orgNames.org_name_en || form.name, reminder_intervals: intervals, star_reminder_days: starDays,
+      // Stored only when changed from the built-in text, so default wording updates still apply.
+      thank_you_template_en: thankYou.en.trim() && thankYou.en.trim() !== DEFAULT_THANK_YOU_EN ? thankYou.en.trim() : null,
+      thank_you_template_ta: thankYou.ta.trim() && thankYou.ta.trim() !== DEFAULT_THANK_YOU_TA ? thankYou.ta.trim() : null,
     };
     const run = (p: Record<string, unknown>) => org
       ? supabase.from('organization_settings').update(p).eq('id', org.id)
@@ -75,6 +81,7 @@ export default function SettingsPage() {
     const optional: { columns: string[]; migration: string; what: string }[] = [
       { columns: ['org_name_en', 'org_name_ta'], migration: '00009', what: 'the organization names' },
       { columns: ['star_reminder_days'], migration: '00011', what: 'the star day reminder days' },
+      { columns: ['thank_you_template_en', 'thank_you_template_ta'], migration: '00013', what: 'the thank-you templates' },
     ];
     const skipped: string[] = [];
     let { error: err } = await run(payload);
@@ -190,6 +197,29 @@ export default function SettingsPage() {
             <Label htmlFor="star-reminder-days">Days before</Label>
             <Input id="star-reminder-days" type="number" min="0" max="15" inputMode="numeric" value={starReminderDays} onChange={(e) => setStarReminderDays(e.target.value)} />
           </div>
+        </Card>
+
+        <Card className="p-5 space-y-4">
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Thank You Message Template</h3>
+          <p className="text-sm text-muted-foreground">
+            Sent after a donation is recorded. Placeholders: {'{{sponsor_name}}'}, {'{{amount}}'}, {'{{date}}'}, {'{{donation_type}}'}.
+            The signature ({'{{organization_name}}'}: VP TRUST and the Tamil name) is added once at the end automatically.
+          </p>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="thank-you-en">English</Label>
+              <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={!isAdmin} onClick={() => setThankYou((t) => ({ ...t, en: DEFAULT_THANK_YOU_EN }))}>Reset to default</Button>
+            </div>
+            <Textarea id="thank-you-en" value={thankYou.en} onChange={(e) => setThankYou((t) => ({ ...t, en: e.target.value }))} rows={6} disabled={!isAdmin} />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="thank-you-ta">Tamil (தமிழ்)</Label>
+              <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={!isAdmin} onClick={() => setThankYou((t) => ({ ...t, ta: DEFAULT_THANK_YOU_TA }))}>Reset to default</Button>
+            </div>
+            <Textarea id="thank-you-ta" lang="ta" value={thankYou.ta} onChange={(e) => setThankYou((t) => ({ ...t, ta: e.target.value }))} rows={6} disabled={!isAdmin} />
+          </div>
+          {!isAdmin && <p className="text-xs text-muted-foreground">Only an admin can change the thank-you templates.</p>}
         </Card>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
