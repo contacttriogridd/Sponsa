@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MessageCircle, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { WishComposer } from '@/components/shared/WishComposer';
+import { SendMessageDialog } from '@/components/shared/SendMessageDialog';
+import { logMessage } from '@/lib/message-service';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { renderTemplate } from '@/lib/templates';
@@ -59,13 +59,22 @@ export function SendWishButton({ sponsor, starDate, size = 'sm' }: SendWishButto
     return { text, type: template.type, name: template.name };
   }, [ctx, sponsor, starDate, daysLeft]);
 
-  async function log(channel: 'whatsapp' | 'copy', message: string) {
-    // Best effort: the history table arrives with migration 00012.
+  async function logWish(channel: 'whatsapp' | 'copy', message: string) {
     await supabase.from('monthly_wish_log').insert({
       monthly_sponsor_id: sponsor.id, star_date: starDate, template_type: composed?.type || null,
       channel, message, sent_by: appUser?.id || null,
     });
     notifyDrawerDataChanged();
+  }
+
+  // One click: straight to WhatsApp, recorded in both logs.
+  function onDirectSend(message: string) {
+    logWish('whatsapp', message);
+    logMessage({
+      sponsorId: sponsor.sponsor_id, sponsorName: sponsor.name, sponsorPhone: phone, messageType: 'event_wish', typeLabel: 'Star Day Wish',
+      relatedEventId: `star:${sponsor.id}`, occurrenceDate: starDate, messageText: message, recipient: 'sponsor', recipientPhone: number,
+      channel: 'whatsapp_link', status: 'opened', by: { id: appUser?.id, name: appUser?.full_name || appUser?.email },
+    });
   }
 
   const sendButton = (
@@ -83,7 +92,7 @@ export function SendWishButton({ sponsor, starDate, size = 'sm' }: SendWishButto
   return (
     <div className="inline-flex" onClick={(e) => e.stopPropagation()}>
       {composed && number ? (
-        <a href={buildWhatsAppUrl(number, composed.text)} target="_blank" rel="noreferrer" onClick={() => log('whatsapp', composed.text)}>
+        <a href={buildWhatsAppUrl(number, composed.text)} target="_blank" rel="noreferrer" onClick={() => onDirectSend(composed.text)}>
           {sendButton}
         </a>
       ) : (
@@ -102,24 +111,20 @@ export function SendWishButton({ sponsor, starDate, size = 'sm' }: SendWishButto
         <Pencil className="h-3.5 w-3.5" />
       </Button>
 
-      <Dialog open={editing} onOpenChange={setEditing}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-          <DialogHeader>
-            <DialogTitle>Send Wish — {sponsor.name}</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground -mt-2">
-            {sponsor.star != null && `${STARS[sponsor.star].ta} (${STARS[sponsor.star].en}) · `}
-            {formatStarDate(starDate)} · {whenLabel(daysLeft)}
-            {composed && <> · Template: <span className="font-medium text-foreground">{composed.name}</span></>}
-          </p>
-          <p className="text-sm">
-            {number
-              ? <>WhatsApp chat: <span className="font-medium">+{number}</span>{!sponsor.phone && linkedPhone ? ' (linked sponsor’s number)' : ''}</>
-              : <span className="text-warning">No mobile number saved for {sponsor.name}. Add one with Edit, or open WhatsApp and pick the chat yourself.</span>}
-          </p>
-          {composed && <WishComposer initialText={composed.text} phone={phone} onSend={log} />}
-        </DialogContent>
-      </Dialog>
+      <SendMessageDialog
+        open={editing}
+        onOpenChange={setEditing}
+        title={`Send Wish — ${sponsor.name}`}
+        sponsorId={sponsor.sponsor_id}
+        sponsorName={sponsor.name}
+        phone={phone}
+        messageType="event_wish"
+        typeLabel={`Star Day Wish${sponsor.star != null ? ` – ${STARS[sponsor.star].ta} (${STARS[sponsor.star].en})` : ''} · ${formatStarDate(starDate)} · ${whenLabel(daysLeft)}`}
+        initialText={composed?.text ?? null}
+        relatedEventId={`star:${sponsor.id}`}
+        occurrenceDate={starDate}
+        onLogged={(channel, text) => logWish(channel === 'copy' ? 'copy' : 'whatsapp', text)}
+      />
     </div>
   );
 }

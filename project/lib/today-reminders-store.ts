@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase/client';
 import { getTodayIST, msUntilNextMidnightIST } from '@/lib/dateHelpers';
 import { buildReminderItems, type ReminderItem } from '@/lib/today-reminders';
 import { shiftDate } from '@/lib/recurrence';
-import type { Donation, FamilyMember, MonthlySponsor, SpecialOccasion, Sponsor, SponsorshipRequest } from '@/lib/types';
+import type { Donation, FamilyMember, MessageLog, MonthlySponsor, SpecialOccasion, Sponsor, SponsorshipRequest } from '@/lib/types';
 
 export interface ReminderData {
   today: string;
@@ -13,6 +13,10 @@ export interface ReminderData {
   /** Latest donation per sponsor, for "Send Thanks" on non-donation reminders. */
   latestDonation: Map<string, Donation>;
   done: Set<string>;
+  /** Today's sponsor messages by reminder key (newest first). Resets each day via occurrence_date. */
+  messagesByKey: Map<string, MessageLog[]>;
+  /** Today's summary to the admin, if it went out. */
+  summaryLog: MessageLog | null;
 }
 
 const LOCAL_DONE_KEY = 'vp_reminders_done';
@@ -29,7 +33,7 @@ function localDone(today: string): string[] {
 let cache: { at: number; today: string; promise: Promise<ReminderData> } | null = null;
 
 async function fetchData(today: string): Promise<ReminderData> {
-  const [s, o, f, m, d, r, c] = await Promise.all([
+  const [s, o, f, m, d, r, c, l] = await Promise.all([
     supabase.from('sponsors').select('*').eq('status', 'active'),
     supabase.from('special_occasions').select('*').eq('active', true),
     supabase.from('family_members').select('*'),
@@ -37,6 +41,7 @@ async function fetchData(today: string): Promise<ReminderData> {
     supabase.from('donations').select('*').order('donation_date', { ascending: false }).limit(500),
     supabase.from('sponsorship_requests').select('*').or(`special_date.gte.${shiftDate(today, -7)},recurrence.in.(daily,weekly,monthly,yearly)`),
     supabase.from('reminder_completions').select('item_key').eq('reminder_date', today),
+    supabase.from('message_logs').select('*').eq('occurrence_date', today).order('sent_at', { ascending: false }),
   ]);
   // Before migration 00015 there is no recurrence column to filter on.
   const requests = r.error
@@ -45,8 +50,17 @@ async function fetchData(today: string): Promise<ReminderData> {
   const donations = (d.data || []) as Donation[];
   const latestDonation = new Map<string, Donation>();
   for (const x of donations) if (!latestDonation.has(x.sponsor_id)) latestDonation.set(x.sponsor_id, x);
+  const logs = (l.error ? [] : l.data || []) as MessageLog[];
+  const messagesByKey = new Map<string, MessageLog[]>();
+  for (const x of logs) {
+    if (x.recipient !== 'sponsor' || x.status === 'failed') continue;
+    const key = x.related_event_id || (x.related_donation_id ? `don:${x.related_donation_id}` : null);
+    if (key) messagesByKey.set(key, [...(messagesByKey.get(key) || []), x]);
+  }
   return {
     today,
+    messagesByKey,
+    summaryLog: logs.find((x) => x.message_type === 'admin_daily_summary' && x.status !== 'failed') || null,
     items: buildReminderItems({
       sponsors: (s.data || []) as Sponsor[],
       occasions: (o.data || []) as SpecialOccasion[],

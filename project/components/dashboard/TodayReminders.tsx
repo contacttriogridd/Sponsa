@@ -12,6 +12,10 @@ import { useAuth } from '@/lib/auth-context';
 import { normalizeDonationType } from '@/lib/constants';
 import { openMonthlySponsorDrawer, openSponsorDrawer } from '@/lib/drawer-store';
 import { setReminderDone, type ReminderData } from '@/lib/today-reminders-store';
+import { buildDailySummary, formatTimeIST, isSummaryOverdue, messagingSettingsFrom, type MessagingSettings } from '@/lib/messaging';
+import { logMessage, sendViaApi } from '@/lib/message-service';
+import { loadWishContext } from '@/lib/star-wish';
+import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import type { ReminderItem } from '@/lib/today-reminders';
 import type { Donation, SpecialOccasion, Sponsor } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -40,9 +44,10 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
   const { appUser } = useAuth();
   const [localDone, setLocalDone] = useState<Record<string, boolean>>({});
   const [wish, setWish] = useState<ReminderItem | null>(null);
-  const [thanks, setThanks] = useState<{ sponsor: Sponsor; donation: Donation } | null>(null);
+  const [thanks, setThanks] = useState<{ sponsor: Sponsor; donation: Donation; eventKey: string } | null>(null);
   const [canAsk, setCanAsk] = useState(false);
   const announced = useRef<string | null>(null);
+  const [settings, setSettings] = useState<MessagingSettings>(messagingSettingsFrom(null));
 
   const today = data?.items.filter((i) => i.group === 'today') || [];
   const isDone = (i: ReminderItem) => localDone[i.key] ?? data?.done.has(i.key) ?? false;
@@ -50,6 +55,7 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
 
   useEffect(() => {
     setCanAsk('Notification' in window && Notification.permission === 'default');
+    loadWishContext().then((c) => setSettings(c.messaging));
   }, []);
 
   // Announce once for each day this dashboard stays open.
@@ -77,6 +83,21 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
     setCanAsk(false);
     if (data && pending > 0) notifyOncePerDay(pending, data.today);
   }
+
+  const employee = { id: appUser?.id, name: appUser?.full_name || appUser?.email };
+  const summaryText = data ? buildDailySummary(data.items, data.today) : '';
+  const summaryBase = {
+    messageType: 'admin_daily_summary' as const, typeLabel: 'Admin Daily Summary', occurrenceDate: data?.today || '', messageText: summaryText,
+    recipient: 'admin' as const, recipientPhone: settings.adminNumber, by: employee,
+  };
+  async function sendSummaryAutomatic() {
+    const result = await sendViaApi(settings.adminNumber, summaryText);
+    await logMessage({ ...summaryBase, channel: 'whatsapp_api', status: result.success ? 'sent' : 'failed', errorMessage: result.error, providerMessageId: result.messageId });
+    if (result.success) toast.success('Summary sent to admin');
+    else toast.error('Automatic send failed. Change to Manual mode in Settings to use the WhatsApp link.');
+    onChanged();
+  }
+  const summarySent = !!data?.summaryLog;
 
   const birthdays = today.filter((i) => i.kind === 'birthday');
   const events = today.filter((i) => i.kind !== 'birthday');
@@ -111,6 +132,11 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
                 </div>
                 {done && <Badge variant="outline" className="text-success border-success/30 bg-success/10">Done</Badge>}
               </div>
+              {(data?.messagesByKey.get(item.key) || []).slice(0, 1).map((m) => (
+                <p key={m.id} className={cn('text-xs mt-2', m.status === 'opened' ? 'text-muted-foreground' : 'text-success')}>
+                  {m.status === 'opened' ? 'WhatsApp opened, not confirmed' : `✓ ${m.message_type === 'donation_thanks' ? 'Thanks' : 'Wish'} sent at ${formatTimeIST(m.sent_at)}${m.sent_by_name ? ` by ${m.sent_by_name}` : ''}`}
+                </p>
+              ))}
               <div className="flex flex-wrap gap-2 mt-3">
                 <Button size="sm" variant="outline" className="text-green-600 border-green-200 hover:bg-green-50" onClick={() => setWish(item)}>
                   <MessageCircle className="h-3.5 w-3.5 mr-1.5" />Send WhatsApp Wish
@@ -120,7 +146,7 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
                   variant="outline"
                   disabled={!donation || !item.sponsor}
                   title={donation ? undefined : 'No donation recorded for this person yet'}
-                  onClick={() => { if (donation && item.sponsor) setThanks({ sponsor: item.sponsor, donation }); }}
+                  onClick={() => { if (donation && item.sponsor) setThanks({ sponsor: item.sponsor, donation, eventKey: item.key }); }}
                 >
                   <Heart className="h-3.5 w-3.5 mr-1.5" />Send Thanks
                 </Button>
@@ -160,6 +186,25 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
         </div>
         {canAsk && <Button variant="ghost" size="sm" className="text-xs h-7" onClick={enableAlerts}>Enable desktop alerts</Button>}
       </div>
+      {data && settings.dailySummaryEnabled && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+          {summarySent ? (
+            <span className="text-success">✓ Today&apos;s summary sent to {settings.adminName} at {formatTimeIST(data.summaryLog!.sent_at)}</span>
+          ) : settings.sendMode === 'automatic' ? (
+            <Button size="sm" variant="outline" onClick={sendSummaryAutomatic}>📤 Send Today&apos;s Summary to Admin</Button>
+          ) : (
+            <a
+              href={buildWhatsAppUrl(settings.adminNumber, summaryText)}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => { logMessage({ ...summaryBase, channel: 'whatsapp_link', status: 'opened' }).then(onChanged); }}
+            >
+              <Button size="sm" variant="outline">📤 Send Today&apos;s Summary to Admin</Button>
+            </a>
+          )}
+          {isSummaryOverdue(settings, summarySent) && <span className="text-destructive">Today&apos;s summary hasn&apos;t been sent yet.</span>}
+        </div>
+      )}
       {!data ? (
         <div className="h-24 rounded-xl bg-amber-100/50 animate-pulse" />
       ) : today.length === 0 ? (
@@ -178,6 +223,7 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
           occasionDate={data?.today}
           open
           skipLog={!wish?.sponsor}
+          relatedEventId={wish?.key}
           onOpenChange={(o) => { if (!o) setWish(null); }}
           onSent={onChanged}
         />
@@ -186,6 +232,8 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
         <ThankYouDialog
           sponsor={thanks.sponsor}
           donation={thanks.donation}
+          relatedEventId={thanks.eventKey}
+          occurrenceDate={data?.today}
           onOpenChange={(o) => { if (!o) setThanks(null); }}
           onSent={onChanged}
         />

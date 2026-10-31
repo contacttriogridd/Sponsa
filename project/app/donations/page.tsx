@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Gift, Plus, Trash2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -11,10 +11,15 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DonationForm } from '@/components/shared/DonationForm';
 import { DeleteRecordDialog, type DeletableRecord } from '@/components/shared/DeleteRecordDialog';
+import { ThankYouDialog } from '@/components/shared/ThankYouDialog';
+import { ThanksStatusButton } from '@/components/shared/ThanksStatusButton';
+import { toast } from 'sonner';
+import { useDrawerDataChanged } from '@/lib/drawer-store';
+import { thanksStatus } from '@/lib/messaging';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDate, normalizeDonationType } from '@/lib/constants';
-import type { Sponsor } from '@/lib/types';
+import type { Donation, MessageLog, Sponsor } from '@/lib/types';
 
 export default function DonationsPage() {
   const { appUser } = useAuth();
@@ -26,18 +31,24 @@ export default function DonationsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedSponsorId, setSelectedSponsorId] = useState('');
+  const [logs, setLogs] = useState<MessageLog[]>([]);
+  const [thanksFilter, setThanksFilter] = useState<'all' | 'sent' | 'pending'>('all');
+  const [thanking, setThanking] = useState<any | null>(null);
 
-  const load = async () => {
-    const [d, s] = await Promise.all([
-      supabase.from('donations').select('*, sponsors(full_name)').order('donation_date', { ascending: false }),
+  const load = useCallback(async () => {
+    const [d, s, l] = await Promise.all([
+      supabase.from('donations').select('*, sponsors(id, full_name, preferred_name, phone, whatsapp, email)').order('donation_date', { ascending: false }),
       supabase.from('sponsors').select('id,full_name').eq('status', 'active').order('full_name'),
+      supabase.from('message_logs').select('*').eq('message_type', 'donation_thanks'),
     ]);
     setItems(d.data || []);
     setSponsors((s.data || []) as Sponsor[]);
+    setLogs((l.error ? [] : l.data || []) as MessageLog[]);
     setLoading(false);
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+  useDrawerDataChanged(load);
 
   const now = new Date();
   const filtered = items.filter((d) => {
@@ -49,7 +60,9 @@ export default function DonationsPage() {
       (filter === 'month' && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()) ||
       (filter === 'year' && date.getFullYear() === now.getFullYear());
     const matchQuery = !query || d.sponsors?.full_name?.toLowerCase().includes(query.toLowerCase()) || d.occasion_name?.toLowerCase().includes(query.toLowerCase());
-    return matchFilter && matchQuery;
+    const thanked = thanksStatus(d, logs).sent;
+    const matchThanks = thanksFilter === 'all' || (thanksFilter === 'sent' ? thanked : !thanked);
+    return matchFilter && matchQuery && matchThanks;
   });
 
   const total = filtered.reduce((a, d) => a + Number(d.amount || 0), 0);
@@ -109,6 +122,11 @@ export default function DonationsPage() {
                 </Button>
               ))}
             </div>
+            <div className="flex flex-wrap gap-1 md:border-l md:pl-3 border-border">
+              {([['all', 'All'], ['sent', 'Thanks Sent'], ['pending', 'Thanks Pending']] as const).map(([key, label]) => (
+                <Button key={key} variant={thanksFilter === key ? 'secondary' : 'ghost'} size="sm" onClick={() => setThanksFilter(key)}>{label}</Button>
+              ))}
+            </div>
           </div>
         </Card>
 
@@ -118,7 +136,7 @@ export default function DonationsPage() {
           <div className="grid gap-3">
             {filtered.map((d) => (
               <Card key={d.id} className="p-4">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-xl bg-success/10 flex items-center justify-center">
                       <Gift className="h-5 w-5 text-success" />
@@ -139,7 +157,8 @@ export default function DonationsPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center justify-end gap-2 shrink-0">
+                    <ThanksStatusButton donation={d as Donation} logs={logs} onSend={() => setThanking(d)} />
                     <div className="text-right">
                       <div className="font-bold text-success">{formatCurrency(Number(d.amount))}</div>
                       {d.donation_id && <div className="text-xs text-muted-foreground">{d.donation_id}</div>}
@@ -190,13 +209,30 @@ export default function DonationsPage() {
               <DonationForm
                 sponsorId={selectedSponsorId}
                 sponsorName={selectedSponsor.full_name}
-                onSaved={() => { setShowForm(false); setSelectedSponsorId(''); load(); }}
+                onSaved={(saved) => {
+                  setShowForm(false);
+                  const donor = selectedSponsor;
+                  setSelectedSponsorId('');
+                  load();
+                  toast.success('Donation saved — Send Thanks now?');
+                  setTimeout(() => {
+                    supabase.from('sponsors').select('*').eq('id', donor.id).single().then(({ data }) => setThanking({ ...saved, sponsors: data }));
+                  }, 400);
+                }}
                 onCancel={() => { setShowForm(false); setSelectedSponsorId(''); }}
               />
             )}
           </div>
         </DialogContent>
       </Dialog>
+      {thanking?.sponsors && (
+        <ThankYouDialog
+          sponsor={thanking.sponsors}
+          donation={thanking as Donation}
+          onOpenChange={(o) => { if (!o) setThanking(null); }}
+          onSent={() => load()}
+        />
+      )}
       <DeleteRecordDialog
         record={deleting}
         onOpenChange={(open) => { if (!open) setDeleting(null); }}

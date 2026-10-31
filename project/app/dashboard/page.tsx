@@ -14,7 +14,7 @@ import type { Donation, Sponsor, SpecialOccasion, SponsorshipRequest, Task } fro
 import { formatCurrency, formatDateShort, OCCASION_ICONS, normalizeDonationType } from '@/lib/constants';
 import { occasionHeadline, occasionRelation } from '@/lib/occasion-text';
 import { StarDaysThisWeekCard } from '@/components/monthly/StarDaysThisWeekCard';
-import { openSponsorDrawer } from '@/lib/drawer-store';
+import { openSponsorDrawer, useDrawerDataChanged } from '@/lib/drawer-store';
 import { TodayReminders } from '@/components/dashboard/TodayReminders';
 import { UpcomingPastCards } from '@/components/dashboard/UpcomingPastCards';
 import { loadReminderData, useLiveRefresh, type ReminderData } from '@/lib/today-reminders-store';
@@ -27,6 +27,7 @@ export default function DashboardPage() {
   const load = useCallback(async()=>{ const [s,o,d,r,t]=await Promise.all([supabase.from('sponsors').select('*').eq('status','active'),supabase.from('special_occasions').select('*').eq('active',true),supabase.from('donations').select('*').order('donation_date',{ascending:false}).limit(5),supabase.from('sponsorship_requests').select('*').in('status',['pending','contacted','interested']),supabase.from('tasks').select('*').neq('status','Completed').order('due_date')]); setSponsors((s.data||[]) as Sponsor[]);setOccasions((o.data||[]) as SpecialOccasion[]);setDonations((d.data||[]) as Donation[]);setRequests((r.data||[]) as SponsorshipRequest[]);setTasks((t.data||[]) as Task[]);setLoading(false); setReminders(await loadReminderData(true)); },[]);
   useEffect(() => { load(); }, [load]);
   useLiveRefresh(load);
+  useDrawerDataChanged(load);
   const sponsorById = useMemo(()=>new Map(sponsors.map(x=>[x.id,x])),[sponsors]);
   const thisWeekCount = useMemo(()=>new Set((reminders?.items||[]).filter(i=>i.group==='today'||(i.group==='upcoming'&&i.days<=7)).map(i=>i.key.replace('#next',''))).size,[reminders]); const totalDonations=donations.reduce((a,d)=>a+Number(d.amount||0),0); const people=donations.reduce((a,d)=>a+Number(d.people_helped||0),0);
   if (loading) return <AppLayout><LoadingSkeleton variant="grid" className="mb-6" /><LoadingSkeleton /></AppLayout>;

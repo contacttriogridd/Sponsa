@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase/client';
-import type { Sponsor, FamilyMember, SpecialOccasion, Donation, Interaction, SponsorshipRequest } from '@/lib/types';
+import type { Sponsor, FamilyMember, SpecialOccasion, Donation, Interaction, MessageLog, SponsorshipRequest } from '@/lib/types';
 import { formatCurrency, formatDate, formatDateShort, OCCASION_ICONS, normalizeDonationType } from '@/lib/constants';
 import { nextOccurrenceOf, daysUntil, getRelativeDayLabel } from '@/lib/date-utils';
 import { occasionDateLine, occasionHeadline, occasionRelation } from '@/lib/occasion-text';
@@ -31,7 +31,9 @@ import { DeleteRecordDialog, type DeletableRecord } from '@/components/shared/De
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
 import { ThankYouDialog } from '@/components/shared/ThankYouDialog';
-import { THANK_YOU_CHANNEL_LABELS } from '@/lib/thank-you';
+import { ThanksStatusButton } from '@/components/shared/ThanksStatusButton';
+import { MessageHistory } from '@/components/shared/MessageHistory';
+import { useDrawerDataChanged } from '@/lib/drawer-store';
 
 type DialogType = 'edit' | 'addFamily' | 'editFamily' | 'addOccasion' | 'editOccasion' | 'addDonation' | 'addSponsorship' | null;
 
@@ -51,17 +53,19 @@ export default function SponsorDetailPage() {
   const [loading, setLoading] = useState(true);
   const [dialog, setDialog] = useState<DialogType>(null);
   const [thankingDonation, setThankingDonation] = useState<Donation | null>(null);
+  const [messageLogs, setMessageLogs] = useState<MessageLog[]>([]);
   const [editingFamily, setEditingFamily] = useState<FamilyMember | null>(null);
   const [editingOccasion, setEditingOccasion] = useState<SpecialOccasion | null>(null);
 
   const load = useCallback(async () => {
-    const [s, f, o, d, i, r] = await Promise.all([
+    const [s, f, o, d, i, r, m] = await Promise.all([
       supabase.from('sponsors').select('*').eq('id', id).single(),
       supabase.from('family_members').select('*').eq('sponsor_id', id).order('full_name'),
       supabase.from('special_occasions').select('*').eq('sponsor_id', id).order('occasion_date'),
       supabase.from('donations').select('*').eq('sponsor_id', id).order('donation_date', { ascending: false }),
       supabase.from('interactions').select('*').eq('sponsor_id', id).order('interaction_date', { ascending: false }),
       supabase.from('sponsorship_requests').select('*').eq('sponsor_id', id).order('created_at', { ascending: false }),
+      supabase.from('message_logs').select('*').eq('sponsor_id', id).order('sent_at', { ascending: false }),
     ]);
     if (s.data) setSponsor(s.data as Sponsor);
     setFamily((f.data || []) as FamilyMember[]);
@@ -69,10 +73,12 @@ export default function SponsorDetailPage() {
     setDonations((d.data || []) as Donation[]);
     setInteractions((i.data || []) as Interaction[]);
     setRequests((r.data || []) as SponsorshipRequest[]);
+    setMessageLogs((m.error ? [] : m.data || []) as MessageLog[]);
     setLoading(false);
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+  useDrawerDataChanged(load);
 
   async function archiveSponsor() {
     if (!sponsor) return;
@@ -268,6 +274,7 @@ export default function SponsorDetailPage() {
             <TabsTrigger value="sponsorships">Sponsorships ({requests.length})</TabsTrigger>
             <TabsTrigger value="donations">Donations ({donations.length})</TabsTrigger>
             <TabsTrigger value="timeline">Timeline</TabsTrigger>
+            <TabsTrigger value="messages">📨 Message History</TabsTrigger>
           </TabsList>
 
           {/* Overview */}
@@ -468,20 +475,7 @@ export default function SponsorDetailPage() {
                         <div className="font-semibold">{formatCurrency(Number(d.amount))}</div>
                         {d.donation_id && <div className="text-xs text-muted-foreground">{d.donation_id}</div>}
                       </div>
-                      {d.thank_you_sent ? (
-                        <Badge
-                          variant="outline"
-                          className="ml-2 text-success border-success/30 bg-success/10 whitespace-nowrap cursor-pointer"
-                          title={`${d.thank_you_sent_at ? `Sent ${formatDate(d.thank_you_sent_at)}. ` : ''}Click to send again`}
-                          onClick={() => setThankingDonation(d)}
-                        >
-                          Thanked ✓{d.thank_you_channel ? ` via ${THANK_YOU_CHANNEL_LABELS[d.thank_you_channel]}` : ''}
-                        </Badge>
-                      ) : (
-                        <Button variant="outline" size="sm" className="ml-2" onClick={() => setThankingDonation(d)}>
-                          <Heart className="h-3.5 w-3.5 mr-1.5" />Send Thanks
-                        </Button>
-                      )}
+                      <div className="ml-2"><ThanksStatusButton donation={d} logs={messageLogs} onSend={() => setThankingDonation(d)} /></div>
                       {appUser?.role === 'admin' && (
                         <Button variant="ghost" size="icon" className="text-destructive" aria-label="Delete donation"
                           onClick={() => setDeletingRecord({
@@ -499,6 +493,10 @@ export default function SponsorDetailPage() {
           </TabsContent>
 
           {/* Timeline */}
+          <TabsContent value="messages" className="mt-4">
+            <MessageHistory logs={messageLogs} />
+          </TabsContent>
+
           <TabsContent value="timeline" className="mt-4">
             <Card className="p-5">
               <Timeline events={timelineEvents} />
@@ -557,7 +555,7 @@ export default function SponsorDetailPage() {
                 setDialog(null);
                 load();
                 // Saved successfully: confirm, then offer the thank-you message.
-                toast.success('Donation recorded');
+                toast.success('Donation saved — Send Thanks now?');
                 setTimeout(() => setThankingDonation(d), 400);
               }}
               onCancel={() => setDialog(null)}
@@ -569,12 +567,7 @@ export default function SponsorDetailPage() {
           sponsor={sponsor}
           donation={thankingDonation}
           onOpenChange={(o) => { if (!o) setThankingDonation(null); }}
-          onSent={(updated, channel) => {
-            setDonations((prev) => prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)));
-            setSponsor((prev) => (prev ? { ...prev, last_contact_date: new Date().toISOString().split('T')[0] } : prev));
-            if (channel !== 'copy') toast.success(`Thank-you sent via ${THANK_YOU_CHANNEL_LABELS[channel]}`);
-            load();
-          }}
+          onSent={() => load()}
         />
 
         <Dialog open={dialog === 'addSponsorship'} onOpenChange={(o) => !o && setDialog(null)}>

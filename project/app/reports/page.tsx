@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Download, BarChart3, Users, Gift, HandHeart } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
@@ -170,6 +171,14 @@ export default function ReportsPage() {
         )}
 
         <MonthlySponsorsReport />
+
+        <Card className="p-4 flex items-center justify-between gap-3">
+          <div>
+            <div className="font-medium">📨 Message Log</div>
+            <div className="text-sm text-muted-foreground">Every wish, thank-you and admin message, with filters and CSV export</div>
+          </div>
+          <Link href="/message-log"><Button variant="outline" size="sm">Open</Button></Link>
+        </Card>
 
         <div>
           <h2 className="font-semibold mb-3">Export Data</h2>

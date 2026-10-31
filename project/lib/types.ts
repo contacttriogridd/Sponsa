@@ -23,6 +23,13 @@ export interface OrganizationSettings {
   star_reminder_days?: number | null;
   /** Donation thank-you template; added by migration 00014 (null = built-in text). */
   thank_you_template?: string | null;
+  /** Admin and messaging settings; added by migration 00016. */
+  admin_whatsapp_number?: string | null;
+  admin_name?: string | null;
+  notify_admin_default?: boolean | null;
+  daily_summary_enabled?: boolean | null;
+  daily_summary_time?: string | null;
+  whatsapp_send_mode?: 'manual' | 'automatic' | null;
   logo_url: string | null;
   phone: string | null;
   email: string | null;
@@ -313,5 +320,30 @@ export interface MonthlyWishLog {
   channel: 'whatsapp' | 'copy';
   message: string;
   sent_by: string | null;
+  sent_at: string;
+}
+
+export type MessageType = 'birthday_wish' | 'anniversary_wish' | 'event_wish' | 'donation_thanks' | 'admin_notification' | 'admin_daily_summary';
+
+export interface MessageLog {
+  id: string;
+  sponsor_id: string | null;
+  sponsor_name: string | null;
+  sponsor_phone: string | null;
+  message_type: MessageType;
+  type_label: string | null;
+  related_event_id: string | null;
+  related_donation_id: string | null;
+  occurrence_date: string;
+  message_text: string;
+  recipient: 'sponsor' | 'admin';
+  recipient_phone: string | null;
+  channel: 'whatsapp_link' | 'whatsapp_api' | 'sms' | 'email' | 'copy';
+  status: 'opened' | 'sent' | 'delivered' | 'failed';
+  error_message: string | null;
+  provider_message_id: string | null;
+  admin_notified: boolean;
+  sent_by: string | null;
+  sent_by_name: string | null;
   sent_at: string;
 }

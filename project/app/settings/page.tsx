@@ -17,6 +17,12 @@ import { REMINDER_INTERVAL_OPTIONS } from '@/lib/constants';
 import { organizationNamesFrom } from '@/lib/organization';
 import { DEFAULT_STAR_REMINDER_DAYS } from '@/lib/monthly-sponsors';
 import { THANK_YOU_TEMPLATE, thankYouTemplateFrom } from '@/lib/thank-you';
+import { formatSentAt, messagingSettingsFrom, type MessagingSettings } from '@/lib/messaging';
+import { normalizeIndianNumber } from '@/lib/phone';
+import { clearWishContext } from '@/lib/star-wish';
+import { isWhatsAppConfigured } from '@/lib/whatsapp';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { OrganizationSettings } from '@/lib/types';
 
 export default function SettingsPage() {
@@ -29,6 +35,9 @@ export default function SettingsPage() {
   const [intervals, setIntervals] = useState<number[]>([7, 3, 1, 0]);
   const [starReminderDays, setStarReminderDays] = useState(String(DEFAULT_STAR_REMINDER_DAYS));
   const [thankYou, setThankYou] = useState(THANK_YOU_TEMPLATE);
+  const [messaging, setMessaging] = useState<MessagingSettings>(messagingSettingsFrom(null));
+  const [lastSummary, setLastSummary] = useState<string | null>(null);
+  const [apiReady, setApiReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -51,8 +60,15 @@ export default function SettingsPage() {
         setNames(organizationNamesFrom(data));
         setStarReminderDays(String(data.star_reminder_days ?? DEFAULT_STAR_REMINDER_DAYS));
         setThankYou(thankYouTemplateFrom(data));
+        setMessaging(messagingSettingsFrom(data));
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    isWhatsAppConfigured().then(setApiReady);
+    supabase.from('message_logs').select('sent_at').eq('message_type', 'admin_daily_summary').neq('status', 'failed')
+      .order('sent_at', { ascending: false }).limit(1).then(({ data }) => setLastSummary(data?.[0]?.sent_at || null));
   }, []);
 
   const set = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
@@ -64,6 +80,8 @@ export default function SettingsPage() {
   }
 
   async function save() {
+    const adminNumber = normalizeIndianNumber(messaging.adminNumber);
+    if (!adminNumber) { setError('Admin WhatsApp Number must be a 10-digit Indian mobile number.'); return; }
     setBusy(true); setError('');
     const orgNames = { org_name_en: names.org_name_en.trim(), org_name_ta: names.org_name_ta.trim() };
     // `name` follows the English name so older code reading it stays in step.
@@ -72,6 +90,12 @@ export default function SettingsPage() {
       ...form, ...orgNames, name: orgNames.org_name_en || form.name, reminder_intervals: intervals, star_reminder_days: starDays,
       // Stored only when changed from the built-in text, so default wording updates still apply.
       thank_you_template: thankYou.trim() && thankYou.trim() !== THANK_YOU_TEMPLATE ? thankYou.trim() : null,
+      admin_whatsapp_number: adminNumber,
+      admin_name: messaging.adminName.trim() || 'Admin',
+      notify_admin_default: messaging.notifyAdminDefault,
+      daily_summary_enabled: messaging.dailySummaryEnabled,
+      daily_summary_time: messaging.dailySummaryTime,
+      whatsapp_send_mode: messaging.sendMode,
     };
     const run = (p: Record<string, unknown>) => org
       ? supabase.from('organization_settings').update(p).eq('id', org.id)
@@ -81,6 +105,7 @@ export default function SettingsPage() {
       { columns: ['org_name_en', 'org_name_ta'], migration: '00009', what: 'the organization names' },
       { columns: ['star_reminder_days'], migration: '00011', what: 'the star day reminder days' },
       { columns: ['thank_you_template'], migration: '00014', what: 'the thank-you template' },
+      { columns: ['admin_whatsapp_number', 'admin_name', 'notify_admin_default', 'daily_summary_enabled', 'daily_summary_time', 'whatsapp_send_mode'], migration: '00016', what: 'the admin settings' },
     ];
     const skipped: string[] = [];
     let { error: err } = await run(payload);
@@ -96,7 +121,9 @@ export default function SettingsPage() {
       message = `Other settings saved, but ${skipped.join(' and ')} need database migrations ${optional.filter((o) => skipped.includes(o.what)).map((o) => o.migration).join(' and ')} first.`;
     }
     setBusy(false);
+    clearWishContext();
     if (message) { setError(message); return; }
+    setMessaging((m) => ({ ...m, adminNumber }));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -196,6 +223,47 @@ export default function SettingsPage() {
             <Label htmlFor="star-reminder-days">Days before</Label>
             <Input id="star-reminder-days" type="number" min="0" max="15" inputMode="numeric" value={starReminderDays} onChange={(e) => setStarReminderDays(e.target.value)} />
           </div>
+        </Card>
+
+        <Card className="p-5 space-y-4">
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Admin WhatsApp</h3>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="admin-number">Admin WhatsApp Number</Label>
+              <Input id="admin-number" inputMode="tel" value={messaging.adminNumber} onChange={(e) => setMessaging((m) => ({ ...m, adminNumber: e.target.value }))} disabled={!isAdmin} placeholder="919629522777" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="admin-name">Admin Name</Label>
+              <Input id="admin-name" value={messaging.adminName} onChange={(e) => setMessaging((m) => ({ ...m, adminName: e.target.value }))} disabled={!isAdmin} />
+            </div>
+            <div className="flex items-center gap-2 sm:col-span-2">
+              <Switch id="notify-default" checked={messaging.notifyAdminDefault} onCheckedChange={(v) => setMessaging((m) => ({ ...m, notifyAdminDefault: v }))} disabled={!isAdmin} />
+              <Label htmlFor="notify-default" className="cursor-pointer">Notify admin by default</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch id="daily-summary" checked={messaging.dailySummaryEnabled} onCheckedChange={(v) => setMessaging((m) => ({ ...m, dailySummaryEnabled: v }))} disabled={!isAdmin} />
+              <Label htmlFor="daily-summary" className="cursor-pointer">Daily summary to admin</Label>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="summary-time">Summary time (IST)</Label>
+              <Input id="summary-time" type="time" value={messaging.dailySummaryTime} onChange={(e) => setMessaging((m) => ({ ...m, dailySummaryTime: e.target.value }))} disabled={!isAdmin} />
+              <p className="text-xs text-muted-foreground">Sets when the dashboard reminder appears. Automatic sending runs at 8:00 AM.</p>
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>WhatsApp sending mode</Label>
+              <Select value={messaging.sendMode} onValueChange={(v) => setMessaging((m) => ({ ...m, sendMode: v as MessagingSettings['sendMode'] }))} disabled={!isAdmin}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">Manual (WhatsApp link)</SelectItem>
+                  <SelectItem value="automatic">Automatic (WhatsApp API)</SelectItem>
+                </SelectContent>
+              </Select>
+              {messaging.sendMode === 'automatic' && !apiReady && (
+                <p className="text-xs text-destructive">The WhatsApp API isn&apos;t set up on the server, so Automatic sends will fail.</p>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">Last summary sent: {lastSummary ? formatSentAt(lastSummary) : 'never'}</p>
         </Card>
 
         <Card className="p-5 space-y-4">

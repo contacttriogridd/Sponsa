@@ -5,6 +5,7 @@ import { organizationNamesFrom, type OrganizationNames } from '@/lib/organizatio
 import { RAASIS, STARS } from '@/lib/natchathiram';
 import { formatCurrency } from '@/lib/constants';
 import { effectiveRaasi, formatStarDate } from '@/lib/monthly-sponsors';
+import { messagingSettingsFrom, type MessagingSettings } from '@/lib/messaging';
 import type { MessageTemplate, MonthlySponsor } from '@/lib/types';
 
 /** Used when the database doesn't have the template yet (before migration 00012). */
@@ -36,9 +37,15 @@ export interface WishContext {
   templates: MessageTemplate[];
   organizationNames: OrganizationNames;
   contactPhone: string;
+  messaging: MessagingSettings;
 }
 
 let cache: { at: number; promise: Promise<WishContext> } | null = null;
+
+/** Forgets cached settings after they are saved. */
+export function clearWishContext() {
+  cache = null;
+}
 
 /** Templates and organization details for composing wishes (cached for a minute). */
 export function loadWishContext(): Promise<WishContext> {
@@ -52,6 +59,7 @@ export function loadWishContext(): Promise<WishContext> {
       templates: (templates || []) as MessageTemplate[],
       organizationNames: organizationNamesFrom(org),
       contactPhone: org?.phone || '',
+      messaging: messagingSettingsFrom(org),
     };
   })();
   cache = { at: Date.now(), promise };
@@ -91,14 +99,4 @@ export function starDayVariables(sponsor: MonthlySponsor, starDate: string, days
   };
 }
 
-/**
- * WhatsApp number for wa.me: digits only, in international form. Handles the
- * ways Indian numbers are usually written — "+91 96295 22777",
- * "96295 22777", "096295 22777", "0091 96295 22777".
- */
-export function whatsappNumber(phone: string | null | undefined): string {
-  let digits = (phone || '').replace(/\D/g, '');
-  if (digits.startsWith('00')) digits = digits.slice(2); // international prefix 00
-  if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1); // trunk 0
-  return digits.length === 10 ? `91${digits}` : digits;
-}
+export { whatsappNumber } from '@/lib/phone';

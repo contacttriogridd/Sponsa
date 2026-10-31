@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { sendWhatsAppText, whatsappApiConfig } from '@/lib/whatsapp-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,51 +48,13 @@ export async function POST(request: NextRequest) {
   const auth = await authorize(request);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-
-  if (!accessToken || !phoneNumberId) {
-    return NextResponse.json({ configured: false });
-  }
+  if (!whatsappApiConfig()) return NextResponse.json({ configured: false });
 
   const { phone, message } = await request.json();
   if (!phone || !message || typeof phone !== 'string' || typeof message !== 'string') {
     return NextResponse.json({ error: 'Missing phone or message.' }, { status: 400 });
   }
 
-  try {
-    const response = await fetch(`https://graph.facebook.com/v18.0/${phoneNumberId}/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: phone.replace(/\D/g, ''),
-        type: 'text',
-        text: { body: message },
-      }),
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { configured: true, success: false, error: result.error?.message || 'WhatsApp API error' },
-        { status: 502 }
-      );
-    }
-
-    return NextResponse.json({
-      configured: true,
-      success: true,
-      messageId: result.messages?.[0]?.id,
-    });
-  } catch {
-    return NextResponse.json(
-      { configured: true, success: false, error: 'Network error contacting WhatsApp API.' },
-      { status: 502 }
-    );
-  }
+  const result = await sendWhatsAppText(phone, message);
+  return NextResponse.json(result, { status: result.success ? 200 : 502 });
 }

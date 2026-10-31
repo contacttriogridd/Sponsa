@@ -374,6 +374,7 @@ export function SponsorDetailDrawer({ sponsorId, occasionId, open }: { sponsorId
             sponsor={s}
             occasion={wishDay?.occasion}
             occasionDate={wishDay?.dateKey}
+            relatedEventId={wishDay?.occasion ? `occ:${wishDay.occasion.id}` : null}
             open={dialog === 'wish'}
             onOpenChange={(o) => !o && setDialog(null)}
             onSent={() => load()}
