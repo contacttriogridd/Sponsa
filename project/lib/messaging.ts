@@ -79,13 +79,17 @@ export function wishMessageType(occasionType: string | null | undefined): Messag
 export function buildAdminNotification(input: {
   sponsorName: string; sponsorPhone: string | null; typeLabel: string; occurrenceDate: string;
   message: string; employee: string; sentAt: Date;
+  /** For an occasion: e.g. "Arun's Birthday (Son of Ravi Kumar)" and who received it. */
+  occasion?: string | null; contactName?: string | null;
 }): string {
   const preview = input.message.length > 200 ? `${input.message.slice(0, 200).trimEnd()}…` : input.message;
   return [
     '🔔 *VP TRUST – Message Sent*',
     `👤 Sponsor: ${input.sponsorName}`,
+    ...(input.contactName && input.contactName !== input.sponsorName ? [`🙋 Contact: ${input.contactName}`] : []),
     `📞 Number: ${input.sponsorPhone || 'Not saved'}`,
     `🎉 Type: ${input.typeLabel}`,
+    ...(input.occasion ? [`🗓️ Occasion: ${input.occasion}`] : []),
     `📅 Date: ${formatDateLabel(input.occurrenceDate)}`,
     `💬 Message: ${preview}`,
     `🧑‍💼 Sent by: ${input.employee} at ${formatTimeIST(input.sentAt)}`,
@@ -94,13 +98,15 @@ export function buildAdminNotification(input: {
 
 function summaryLine(item: ReminderItem, index: number): string {
   let label: string;
-  if (item.kind === 'birthday') label = `🎂 ${item.personName !== item.name ? `Birthday (${item.personName})` : 'Birthday'}`;
-  else if (/anniversary/i.test(item.occasion) && !/death/i.test(item.occasion)) label = `💍 ${item.occasion}`;
+  const own = item.kind === 'birthday' && item.personName === item.name;
+  if (item.kind === 'birthday') label = own ? '🎂 Birthday' : `🎂 ${item.occasion}`;
+  else if (item.calm) label = `🪔 ${item.occasion}`;
+  else if (/anniversary/i.test(item.occasion)) label = `💍 ${item.occasion}`;
   else if (item.kind === 'donation' || item.key.startsWith('mspay:') || item.key.startsWith('req:')) {
     const details = [item.donationType ? normalizeDonationType(item.donationType) : null, item.key.startsWith('mspay:') ? 'Monthly' : null].filter(Boolean);
     label = `🍛 Donation Day${details.length ? ` (${details.join(', ')})` : ''}`;
   } else label = `📅 ${item.occasion}`;
-  return `${index + 1}. ${item.name} – ${item.phone || 'No number'} – ${label}`;
+  return `${index + 1}. ${item.contactName || item.name} – ${item.phone || 'No number'} – ${label}`;
 }
 
 /** The morning list of today's reminders for the admin. */

@@ -19,6 +19,8 @@ export interface LogInput {
   typeLabel?: string | null;
   relatedEventId?: string | null;
   relatedDonationId?: string | null;
+  occasionId?: string | null;
+  occasionType?: string | null;
   occurrenceDate: string;
   messageText: string;
   recipient: 'sponsor' | 'admin';
@@ -101,6 +103,8 @@ export async function logMessage(input: LogInput): Promise<MessageLog | null> {
     type_label: input.typeLabel || null,
     related_event_id: input.relatedEventId || null,
     related_donation_id: input.relatedDonationId || null,
+    occasion_id: input.occasionId || null,
+    occasion_type: input.occasionType || null,
     occurrence_date: input.occurrenceDate,
     message_text: input.messageText,
     recipient: input.recipient,

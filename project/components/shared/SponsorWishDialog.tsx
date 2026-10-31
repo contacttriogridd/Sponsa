@@ -4,22 +4,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SendMessageDialog } from '@/components/shared/SendMessageDialog';
-import { wishMessageType } from '@/lib/messaging';
+import {
+  OCCASION_TEMPLATES, fillOccasionMessage, occasionContact, occasionMessageType, occasionSendLabel, occasionTemplateType, occasionTitle, occasionVariables,
+  type OccasionTemplateType,
+} from '@/lib/occasion-details';
 import { renderTemplate } from '@/lib/templates';
 import { loadWishContext, type WishContext } from '@/lib/star-wish';
 import type { MessageTemplate, SpecialOccasion, Sponsor } from '@/lib/types';
 
 // Star-day wishes and donation thank-yous have their own dialogs.
 const STAR_TYPES = ['Star Day Wish', 'Star Day Upcoming', 'Star Day Today', 'Thank You'];
-
-/** Template that fits an occasion: birthday, child's birthday or anniversary wish. */
-function defaultTemplateFor(templates: MessageTemplate[], occasion?: SpecialOccasion | null): MessageTemplate | undefined {
-  let type = 'Birthday Wish';
-  if (occasion?.occasion_type === 'Birthday' && occasion.family_member_id) type = 'Child Birthday';
-  else if (occasion && /Anniversary/.test(occasion.occasion_type) && occasion.occasion_type !== 'Death Anniversary') type = 'Anniversary Wish';
-  else if (occasion && occasion.occasion_type !== 'Birthday') type = 'Follow-up'; // remembrance and other events: no birthday wording
-  return templates.find((t) => t.type === type) || templates[0];
-}
 
 interface SponsorWishDialogProps {
   sponsor: Sponsor;
@@ -40,47 +34,57 @@ export function SponsorWishDialog({ sponsor, occasion, occasionDate, open, onOpe
   const [ctx, setCtx] = useState<WishContext | null>(null);
   const [templateId, setTemplateId] = useState('');
 
-  useEffect(() => {
-    if (!open) return;
-    loadWishContext().then((c) => {
-      setCtx(c);
-      const usable = c.templates.filter((t) => !STAR_TYPES.includes(t.type));
-      setTemplateId(defaultTemplateFor(usable, occasion)?.id || '');
-    });
-  }, [open, occasion]);
+  // Occasion templates from the database, or the built-in text if one is missing.
+  const templates = useMemo(() => {
+    const stored = (ctx?.templates || []).filter((t) => !STAR_TYPES.includes(t.type));
+    const builtIn = (Object.keys(OCCASION_TEMPLATES) as OccasionTemplateType[])
+      .filter((type) => !stored.some((t) => t.type === type))
+      .map((type) => ({ id: `builtin:${type}`, type, name: OCCASION_TEMPLATES[type].name, body: OCCASION_TEMPLATES[type].body }));
+    return [...builtIn, ...stored];
+  }, [ctx]);
 
-  const templates = useMemo(() => (ctx?.templates || []).filter((t) => !STAR_TYPES.includes(t.type)), [ctx]);
+  useEffect(() => {
+    if (open) loadWishContext().then(setCtx);
+  }, [open]);
+
+  useEffect(() => {
+    if (!ctx) return;
+    const wanted = occasionTemplateType(occasion || { person_name: sponsor.full_name, occasion_type: 'Birthday', relationship: 'Self' });
+    setTemplateId(templates.find((t) => t.type === wanted)?.id || '');
+  }, [ctx, templates, occasion, sponsor.full_name]);
+
+  const subject = occasion || { person_name: sponsor.full_name, occasion_type: 'Other' };
+  const contact = occasionContact(occasion, sponsor);
   const template = templates.find((t) => t.id === templateId);
   const text = useMemo(() => {
     if (!ctx || !template) return null;
-    const date = occasionDate
-      ? new Date(`${occasionDate}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })
-      : '';
-    return renderTemplate(template, {
-      sponsor_name: sponsor.preferred_name || sponsor.full_name,
-      person_name: occasion?.person_name || sponsor.full_name,
-      occasion: occasion?.occasion_type || 'special day',
-      date,
-      contact_phone: ctx.contactPhone,
-    }, ctx.organizationNames);
+    const vars = occasionVariables(subject, sponsor, occasionDate, ctx.organizationNames);
+    if (template.type.startsWith('Occasion:')) return fillOccasionMessage(template.body, vars);
+    return renderTemplate(template.body, { ...vars, sponsor_name: contact.name, contact_phone: ctx.contactPhone }, ctx.organizationNames);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx, template, sponsor, occasion, occasionDate]);
 
   return (
     <SendMessageDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Send WhatsApp Wish"
+      title={occasionSendLabel(occasion)}
+      sendLabel={occasionSendLabel(occasion)}
       sponsorId={skipLog ? null : sponsor.id}
-      sponsorName={sponsor.preferred_name || sponsor.full_name}
-      phone={sponsor.whatsapp || sponsor.phone}
-      messageType={wishMessageType(occasion?.occasion_type)}
-      typeLabel={occasion ? `${occasion.occasion_type === 'Other' ? 'Event' : occasion.occasion_type} Wish` : 'Wish'}
+      sponsorName={sponsor.full_name}
+      contactName={contact.name}
+      phone={contact.phone}
+      messageType={occasionMessageType(occasion)}
+      typeLabel={occasion ? occasionSendLabel(occasion).replace('Send ', '') : 'Wish'}
       initialText={text}
       relatedEventId={relatedEventId}
       occurrenceDate={occasionDate}
+      occasionId={occasion?.id}
+      occasionType={occasion?.occasion_type_key || occasion?.occasion_type}
+      occasionTitle={occasion ? occasionTitle(occasion, sponsor.full_name) : null}
       onLogged={() => onSent?.()}
     >
-      {templates.length > 0 ? (
+      {templates.length > 0 && (
         <div className="space-y-1.5">
           <Label>Template</Label>
           <Select value={templateId} onValueChange={setTemplateId}>
@@ -90,9 +94,7 @@ export function SponsorWishDialog({ sponsor, occasion, occasionDate, open, onOpe
             </SelectContent>
           </Select>
         </div>
-      ) : ctx ? (
-        <p className="text-sm text-muted-foreground">No message templates yet. Add one in Settings → Message Templates.</p>
-      ) : null}
+      )}
     </SendMessageDialog>
   );
 }

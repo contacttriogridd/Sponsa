@@ -361,7 +361,7 @@ export function SponsorDetailDrawer({ sponsorId, occasionId, open }: { sponsorId
           <Dialog open={dialog === 'occasion'} onOpenChange={(o) => !o && setDialog(null)}>
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Add Special Day</DialogTitle></DialogHeader>
-              <OccasionForm sponsorId={s.id} defaultPersonName={s.full_name} onCancel={() => setDialog(null)} onSaved={() => { setDialog(null); notifyDrawerDataChanged(); load(); }} />
+              <OccasionForm sponsorId={s.id} defaultPersonName={s.full_name} sponsorPhone={s.whatsapp || s.phone} sponsorDob={s.dob} onCancel={() => setDialog(null)} onSaved={() => { setDialog(null); notifyDrawerDataChanged(); load(); }} />
             </DialogContent>
           </Dialog>
           <FollowUpDialog

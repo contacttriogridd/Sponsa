@@ -33,6 +33,13 @@ export interface SendMessageDialogProps {
   relatedEventId?: string | null;
   relatedDonationId?: string | null;
   occurrenceDate?: string | null;
+  /** The person who receives it, when not the sponsor. */
+  contactName?: string | null;
+  sendLabel?: string;
+  occasionId?: string | null;
+  occasionType?: string | null;
+  /** e.g. "Arun's Birthday (Son of Ravi Kumar)", for the admin message. */
+  occasionTitle?: string | null;
   /** Called after each logged send, with the channel and final text. */
   onLogged?: (channel: MessageLog['channel'], text: string) => void;
   /** Extra controls above the message, e.g. a template picker. */
@@ -42,7 +49,7 @@ export interface SendMessageDialogProps {
 /** The one Send Message modal: editable message, WhatsApp, and the optional details to the admin. */
 export function SendMessageDialog({
   open, onOpenChange, title = 'Send Message', sponsorId, sponsorName, phone, extraChannels, messageType, typeLabel,
-  initialText, relatedEventId, relatedDonationId, occurrenceDate, onLogged, children,
+  initialText, relatedEventId, relatedDonationId, occurrenceDate, contactName, sendLabel = 'Send on WhatsApp', occasionId, occasionType, occasionTitle, onLogged, children,
 }: SendMessageDialogProps) {
   const { appUser } = useAuth();
   const [settings, setSettings] = useState<MessagingSettings>(messagingSettingsFrom(null));
@@ -71,16 +78,16 @@ export function SendMessageDialog({
 
   const base = {
     sponsorId, sponsorName, sponsorPhone: phone, messageType, typeLabel,
-    relatedEventId, relatedDonationId, occurrenceDate: occurrence, recipient: 'sponsor' as const, by,
+    relatedEventId, relatedDonationId, occasionId, occasionType, occurrenceDate: occurrence, recipient: 'sponsor' as const, by,
   };
 
   const adminMessage = () => buildAdminNotification({
     sponsorName, sponsorPhone: phone || null, typeLabel, occurrenceDate: occurrence,
-    message: sentText || text, employee, sentAt: new Date(),
+    message: sentText || text, employee, sentAt: new Date(), occasion: occasionTitle, contactName,
   });
   const adminBase = () => ({
     sponsorId, sponsorName, sponsorPhone: phone, messageType: 'admin_notification' as const,
-    typeLabel: `Details to admin: ${typeLabel}`, relatedEventId, relatedDonationId, occurrenceDate: occurrence,
+    typeLabel: `Details to admin: ${typeLabel}`, relatedEventId, relatedDonationId, occasionId, occasionType, occurrenceDate: occurrence,
     messageText: adminMessage(), recipient: 'admin' as const, recipientPhone: settings.adminNumber, by,
   });
 
@@ -146,7 +153,7 @@ export function SendMessageDialog({
   const whatsappLink = (
     <a href={buildWhatsAppUrl(number, text)} target="_blank" rel="noreferrer" onClick={onLinkClick}>
       <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={initialText == null}>
-        <MessageCircle className="h-4 w-4 mr-2" />Send on WhatsApp
+        <MessageCircle className="h-4 w-4 mr-2" />{sendLabel}
       </Button>
     </a>
   );
@@ -165,6 +172,8 @@ export function SendMessageDialog({
         <div className="space-y-4">
           <div className="p-3 rounded-lg bg-muted text-sm">
             <div className="font-medium">{sponsorName}</div>
+            {occasionTitle && <div>{occasionTitle}</div>}
+            {contactName && contactName !== sponsorName && <div className="text-muted-foreground">Contact: {contactName}</div>}
             <div className="text-muted-foreground">{number ? `+${number}` : 'No phone number saved — WhatsApp will ask you to choose the chat.'}</div>
             <div className="text-muted-foreground">{typeLabel}</div>
           </div>
@@ -192,7 +201,7 @@ export function SendMessageDialog({
           <div className="flex flex-wrap gap-2">
             {automatic && !apiError ? (
               <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={initialText == null || apiBusy} onClick={sendAutomatic}>
-                <MessageCircle className="h-4 w-4 mr-2" />{apiBusy ? 'Sending...' : 'Send on WhatsApp'}
+                <MessageCircle className="h-4 w-4 mr-2" />{apiBusy ? 'Sending...' : sendLabel}
               </Button>
             ) : whatsappLink}
             {extraChannels && (

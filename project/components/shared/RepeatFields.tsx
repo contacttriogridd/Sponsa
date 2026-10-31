@@ -6,25 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RECURRENCE_LABELS, WEEKDAY_NAMES, type Recurrence } from '@/lib/recurrence';
+import { repeatRow, type RepeatValue } from '@/lib/repeat-value';
 
-export interface RepeatValue {
-  recurrence: Recurrence;
-  weekdays: number[];
-  day_of_month: string;
-  end_date: string;
-}
-
-/** Database columns for a RepeatValue; `date` is the event's date, which is also its start. */
-export function repeatPayload(value: RepeatValue, date: string | null) {
-  const repeating = value.recurrence !== 'none';
-  return {
-    recurrence: value.recurrence,
-    weekdays: value.recurrence === 'weekly' && value.weekdays.length ? value.weekdays : null,
-    day_of_month: value.recurrence === 'monthly' && value.day_of_month ? Number(value.day_of_month) : null,
-    start_date: repeating ? date : null,
-    end_date: repeating && value.end_date ? value.end_date : null,
-  };
-}
+export type { RepeatValue };
+export const repeatPayload = repeatRow;
 
 /** The "Repeats" dropdown with its weekday, day-of-month and end-date options. */
 export function RepeatFields({ value, onChange }: { value: RepeatValue; onChange: (value: RepeatValue) => void }) {

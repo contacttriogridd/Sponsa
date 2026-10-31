@@ -1,8 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { OccasionFields } from '@/components/shared/OccasionFields';
+import { TITLES, occasionKeyOf } from '@/lib/occasion-details';
+import { draftFromOccasion, draftToRow, newDraft, validateDraft, type OccasionDraft } from '@/lib/occasion-draft';
+import { useOccasionTypes } from '@/lib/use-occasion-types';
+import type { SpecialOccasion } from '@/lib/types';
+
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, X } from 'lucide-react';
+import { Save, X, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from './DatePicker';
 import { Input } from '@/components/ui/input';
@@ -15,8 +21,6 @@ import { supabase } from '@/lib/supabase/client';
 import type { Sponsor } from '@/lib/types';
 import { COMMUNICATION_PREFERENCES } from '@/lib/constants';
 import { useAuth } from '@/lib/auth-context';
-import { toSpecialOccasion } from '@/lib/family-events';
-import { SponsorFamilyDays, type FamilyDayDraft } from './SponsorFamilyDays';
 
 interface SponsorFormProps {
   sponsor?: Sponsor;
@@ -25,12 +29,15 @@ interface SponsorFormProps {
   onCancel?: () => void;
 }
 
+const NO_TITLE = 'none';
+
 export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
   const router = useRouter();
   const { appUser } = useAuth();
   const isEdit = !!sponsor;
 
   const [form, setForm] = useState({
+    title: sponsor?.title || '',
     full_name: sponsor?.full_name || '',
     preferred_name: sponsor?.preferred_name || '',
     dob: sponsor?.dob || '',
@@ -53,11 +60,37 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
   const [busy, setBusy] = useState(false);
   const [duplicates, setDuplicates] = useState<Sponsor[]>([]);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
-  const [familyDays, setFamilyDays] = useState<FamilyDayDraft[]>([]);
+  const types = useOccasionTypes();
+  const [occasions, setOccasions] = useState<OccasionDraft[]>([]);
+  const [removedOccasionIds, setRemovedOccasionIds] = useState<string[]>([]);
   const [createdId, setCreatedId] = useState<string | null>(null);
 
   const set = (key: string, value: string | boolean) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  // Editing: load the sponsor's occasions so they are managed in one place.
+  useEffect(() => {
+    if (!sponsor) return;
+    (async () => {
+      const { data } = await supabase.from('special_occasions').select('*').eq('sponsor_id', sponsor.id).eq('active', true).order('occasion_date');
+      setOccasions(((data || []) as SpecialOccasion[]).map((o) => draftFromOccasion(o, occasionKeyOf(o))));
+    })();
+  }, [sponsor]);
+
+  const sponsorDefaults = { name: form.full_name, dob: form.dob, phone: form.whatsapp || form.phone };
+
+  /** Saves the occasions; removed ones are deactivated, not deleted. */
+  async function saveOccasions(sponsorId: string): Promise<boolean> {
+    const fresh = occasions.filter((d) => !d.id).map((d) => draftToRow(d, types.find((t) => t.key === d.type_key), sponsorId, sponsorDefaults));
+    const results = await Promise.all([
+      fresh.length ? supabase.from('special_occasions').insert(fresh) : Promise.resolve({ error: null }),
+      ...occasions.filter((d) => d.id && d.touched).map((d) => supabase.from('special_occasions')
+        .update({ ...draftToRow(d, types.find((t) => t.key === d.type_key), sponsorId, sponsorDefaults), is_auto_generated: d.is_auto_generated ?? false })
+        .eq('id', d.id!)),
+      ...removedOccasionIds.map((id) => supabase.from('special_occasions').update({ active: false }).eq('id', id)),
+    ]);
+    return results.every((r) => !r.error);
+  }
 
   async function checkDuplicates(): Promise<Sponsor[]> {
     const name = form.full_name.trim();
@@ -82,6 +115,10 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
       setError('Full name is required.');
       return;
     }
+    for (const d of occasions.filter((x) => !x.id || x.touched)) {
+      const problem = validateDraft(d, types.find((t) => t.key === d.type_key), sponsorDefaults);
+      if (problem) { setError(problem); return; }
+    }
     setBusy(true);
     setError('');
 
@@ -96,6 +133,7 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
     }
 
     const payload = {
+      title: form.title || null,
       full_name: form.full_name.trim(),
       preferred_name: form.preferred_name || null,
       dob: form.dob || null,
@@ -134,6 +172,10 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
           .eq('occasion_type', 'Birthday')
           .is('family_member_id', null);
       }
+      if (!(await saveOccasions(sponsor!.id))) {
+        setError('The sponsor was saved, but some occasions could not be saved. Please try again.');
+        return;
+      }
       onSaved?.(data as Sponsor);
     } else {
       const { data, error: err } = await supabase
@@ -144,19 +186,14 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
       setBusy(false);
       if (err) { setError('Unable to save sponsor. Please try again.'); return; }
       const newSponsor = data as Sponsor;
-      // Only the days the user added themselves become special occasions —
-      // Date of Birth no longer creates a birthday on its own.
-      if (familyDays.length > 0) {
-        const { error: occErr } = await supabase
-          .from('special_occasions')
-          .insert(familyDays.map((d) => toSpecialOccasion(d, newSponsor.id)));
-        if (occErr) {
-          // The sponsor exists now, so don't let a retry create a duplicate.
-          setCreatedId(newSponsor.id);
-          setError('The sponsor was created, but the family events could not be saved. Please add them from the sponsor\'s Special Days tab.');
-          onSaved?.(newSponsor);
-          return;
-        }
+      // Only the occasions the user added become special days;
+      // Date of Birth alone doesn't create one.
+      if (!(await saveOccasions(newSponsor.id))) {
+        // The sponsor exists now, so don't let a retry create a duplicate.
+        setCreatedId(newSponsor.id);
+        setError('The sponsor was created, but the occasions could not be saved. Please add them from the sponsor\'s Occasions tab.');
+        onSaved?.(newSponsor);
+        return;
       }
       onSaved?.(newSponsor);
       router.push(`/sponsors/${newSponsor.id}`);
@@ -204,6 +241,16 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Basic Information</h3>
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
+            <Label>Title</Label>
+            <Select value={form.title || NO_TITLE} onValueChange={(v) => set('title', v === NO_TITLE ? '' : v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_TITLE}>—</SelectItem>
+                {TITLES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
             <Label>Full Name <span className="text-destructive">*</span></Label>
             <Input value={form.full_name} onChange={(e) => set('full_name', e.target.value)} placeholder="e.g. Raj Kumar" />
           </div>
@@ -226,6 +273,42 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
             </Select>
           </div>
         </div>
+      </Card>
+
+      <Card className="p-5 space-y-4">
+        <div>
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Sponsoring For – Occasion</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">எந்த நிகழ்விற்காக?</p>
+        </div>
+        {occasions.map((d, i) => (
+          <div key={d.localId} className="rounded-xl border border-border p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Occasion {i + 1}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="text-destructive"
+                aria-label="Remove occasion"
+                onClick={() => {
+                  if (d.id) setRemovedOccasionIds((ids) => [...ids, d.id!]);
+                  setOccasions((all) => all.filter((x) => x.localId !== d.localId));
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+            <OccasionFields
+              value={d}
+              onChange={(next) => setOccasions((all) => all.map((x) => (x.localId === d.localId ? { ...next, touched: true } : x)))}
+              types={types}
+              sponsor={sponsorDefaults}
+            />
+          </div>
+        ))}
+        <Button type="button" variant="outline" onClick={() => setOccasions((all) => [...all, newDraft(all.length === 0 ? 'self_birthday' : 'family_birthday')])}>
+          <Plus className="h-4 w-4 mr-2" />{occasions.length === 0 ? 'Add an occasion' : 'Add another occasion'}
+        </Button>
       </Card>
 
       <Card className="p-5 space-y-4">
@@ -302,8 +385,6 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
           </div>
         </div>
       </Card>
-
-      {!isEdit && <SponsorFamilyDays value={familyDays} onChange={setFamilyDays} />}
 
       <Card className="p-5 space-y-4">
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Notes</h3>

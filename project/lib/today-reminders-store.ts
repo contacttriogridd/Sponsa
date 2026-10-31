@@ -33,7 +33,7 @@ function localDone(today: string): string[] {
 let cache: { at: number; today: string; promise: Promise<ReminderData> } | null = null;
 
 async function fetchData(today: string): Promise<ReminderData> {
-  const [s, o, f, m, d, r, c, l] = await Promise.all([
+  const [s, o, f, m, d, r, c, l, t] = await Promise.all([
     supabase.from('sponsors').select('*').eq('status', 'active'),
     supabase.from('special_occasions').select('*').eq('active', true),
     supabase.from('family_members').select('*'),
@@ -42,6 +42,7 @@ async function fetchData(today: string): Promise<ReminderData> {
     supabase.from('sponsorship_requests').select('*').or(`special_date.gte.${shiftDate(today, -7)},recurrence.in.(daily,weekly,monthly,yearly)`),
     supabase.from('reminder_completions').select('item_key').eq('reminder_date', today),
     supabase.from('message_logs').select('*').eq('occurrence_date', today).order('sent_at', { ascending: false }),
+    supabase.from('occasion_types').select('key, icon'),
   ]);
   // Before migration 00015 there is no recurrence column to filter on.
   const requests = r.error
@@ -66,6 +67,7 @@ async function fetchData(today: string): Promise<ReminderData> {
       occasions: (o.data || []) as SpecialOccasion[],
       familyMembers: (f.data || []) as FamilyMember[],
       monthlySponsors: m.error ? [] : (m.data || []) as MonthlySponsor[],
+      occasionIcons: Object.fromEntries((t.error ? [] : t.data || []).map((x) => [x.key, x.icon])),
       donations,
       requests: (requests || []) as SponsorshipRequest[],
     }, today),

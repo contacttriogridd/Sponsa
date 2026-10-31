@@ -67,7 +67,12 @@ ${ORGANIZATION_SIGN_OFF}`, is_approved: false });
 
   const set = (key: string, value: string | boolean) => setForm((f) => ({ ...f, [key]: value }));
 
-  const VARIABLES = ['{{sponsor_name}}', '{{person_name}}', '{{occasion}}', '{{organization_name}}', '{{date}}', '{{star_name}}', '{{raasi_name}}', '{{star_date}}', '{{monthly_amount}}', '{{star_tamil}}', '{{star_english}}', '{{star_day_date}}', '{{star_day_weekday}}', '{{days_left}}', '{{organization_name_tamil}}', '{{contact_phone}}'];
+  // Occasion templates sign with VP TRUST and the Tamil name on separate lines.
+  const previewOf = (type: string, body: string) => (type.startsWith('Occasion:')
+    ? body.replace(/\{\{\s*organization_name\s*\}\}/g, organizationNames.org_name_en).replace(/\{\{\s*organization_name_ta\s*\}\}/g, organizationNames.org_name_ta)
+    : renderTemplate(body, {}, organizationNames));
+
+  const VARIABLES = ['{{sponsor_name}}', '{{person_name}}', '{{occasion}}', '{{organization_name}}', '{{date}}', '{{star_name}}', '{{raasi_name}}', '{{star_date}}', '{{monthly_amount}}', '{{star_tamil}}', '{{star_english}}', '{{star_day_date}}', '{{star_day_weekday}}', '{{days_left}}', '{{organization_name_tamil}}', '{{contact_phone}}', '{{contact_name}}', '{{contact_title_en}}', '{{contact_title_ta}}', '{{relation_en}}', '{{relation_ta}}', '{{event_date}}', '{{donation_line_en}}', '{{donation_line_ta}}', '{{organization_name_ta}}'];
 
   return (
     <AppLayout>
@@ -115,7 +120,7 @@ ${ORGANIZATION_SIGN_OFF}`, is_approved: false });
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1 whitespace-pre-line">{renderTemplate(t, {}, organizationNames)}</p>
+                  <p className="text-sm text-muted-foreground mt-1 whitespace-pre-line">{previewOf(t.type, t.body)}</p>
                   {t.variables.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {t.variables.map((v) => (
@@ -163,7 +168,7 @@ ${ORGANIZATION_SIGN_OFF}`, is_approved: false });
                 {form.body.trim() && (
                   <div className="space-y-1.5 sm:col-span-2">
                     <Label>Preview</Label>
-                    <div className="rounded-md border bg-muted/50 p-3 text-sm whitespace-pre-line">{renderTemplate(form.body, {}, organizationNames)}</div>
+                    <div className="rounded-md border bg-muted/50 p-3 text-sm whitespace-pre-line">{previewOf(form.type, form.body)}</div>
                   </div>
                 )}
               </div>

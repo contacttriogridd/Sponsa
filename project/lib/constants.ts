@@ -123,6 +123,11 @@ export const TEMPLATE_TYPES = [
   'Star Day Wish',
   'Star Day Upcoming',
   'Star Day Today',
+  'Occasion: Own Birthday',
+  'Occasion: Family Birthday',
+  'Occasion: Anniversary',
+  'Occasion: Remembrance',
+  'Occasion: Other',
 ] as const;
 
 export const NAV_ITEMS = [

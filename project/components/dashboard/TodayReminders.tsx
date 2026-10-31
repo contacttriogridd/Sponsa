@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { BellRing, CheckCircle2, Heart, MessageCircle, Phone, RotateCcw } from 'lucide-react';
+import { BellRing, CheckCircle2, Heart, MessageCircle, RotateCcw } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { openMonthlySponsorDrawer, openSponsorDrawer } from '@/lib/drawer-store'
 import { setReminderDone, type ReminderData } from '@/lib/today-reminders-store';
 import { buildDailySummary, formatTimeIST, isSummaryOverdue, messagingSettingsFrom, type MessagingSettings } from '@/lib/messaging';
 import { logMessage, sendViaApi } from '@/lib/message-service';
+import { occasionSendLabel } from '@/lib/occasion-details';
 import { loadWishContext } from '@/lib/star-wish';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import type { ReminderItem } from '@/lib/today-reminders';
@@ -114,21 +115,17 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
             else if (item.monthlySponsor) openMonthlySponsorDrawer(item.monthlySponsor.id);
           };
           return (
-            <div key={item.key} className={cn('rounded-lg border border-border p-3', done && 'opacity-60')}>
+            <div key={item.key} className={cn('rounded-lg border p-3', item.calm ? 'border-slate-300 bg-slate-50' : 'border-border', done && 'opacity-60')}>
               <div className="flex items-start gap-3">
                 <span className="text-xl leading-none mt-0.5">{item.icon}</span>
                 <div className="flex-1 min-w-0">
-                  <button type="button" onClick={open} className="font-medium hover:text-primary text-left">{item.name}</button>
+                  <button type="button" onClick={open} className="font-medium hover:text-primary text-left">{item.occasion}</button>
                   {item.recurrenceBadge && <Badge variant="secondary" className="ml-2 text-xs font-normal">{item.recurrenceBadge}</Badge>}
-                  <div className="text-sm text-muted-foreground">
-                    {item.occasion}{item.subtitle ? ` · ${item.subtitle}` : ''}
-                    {item.donationType ? ` · ${normalizeDonationType(item.donationType)}` : ''}
+                  {item.donationType && <div className="text-sm text-muted-foreground">Donation: {normalizeDonationType(item.donationType)}</div>}
+                  <div className="text-sm text-muted-foreground mt-0.5">
+                    Contact: {item.contactName || item.name}
+                    {item.phone && <> · <a href={`tel:${item.phone}`} className="hover:text-foreground">{item.phone}</a></>}
                   </div>
-                  {item.phone && (
-                    <a href={`tel:${item.phone}`} className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mt-0.5">
-                      <Phone className="h-3 w-3" />{item.phone}
-                    </a>
-                  )}
                 </div>
                 {done && <Badge variant="outline" className="text-success border-success/30 bg-success/10">Done</Badge>}
               </div>
@@ -139,7 +136,7 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
               ))}
               <div className="flex flex-wrap gap-2 mt-3">
                 <Button size="sm" variant="outline" className="text-green-600 border-green-200 hover:bg-green-50" onClick={() => setWish(item)}>
-                  <MessageCircle className="h-3.5 w-3.5 mr-1.5" />Send WhatsApp Wish
+                  <MessageCircle className="h-3.5 w-3.5 mr-1.5" />{item.occasionRecord ? occasionSendLabel(item.occasionRecord) : item.kind === 'birthday' ? 'Send Birthday Wish' : 'Send WhatsApp Wish'}
                 </Button>
                 <Button
                   size="sm"

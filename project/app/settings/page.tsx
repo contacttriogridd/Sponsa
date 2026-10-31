@@ -131,6 +131,7 @@ export default function SettingsPage() {
   const settingsLinks = [
     { href: '/settings/whatsapp', icon: MessageCircle, label: 'WhatsApp Settings', desc: 'Configure WhatsApp Business API' },
     { href: '/settings/templates', icon: FileText, label: 'Message Templates', desc: 'Manage birthday, anniversary and sponsorship templates' },
+    { href: '/settings/occasion-types', icon: FileText, label: 'Occasion Types', desc: 'Birthday, anniversary, remembrance and other occasion choices' },
     { href: '/settings/users', icon: Users, label: 'User Management', desc: 'Add and manage team members' },
   ];
 

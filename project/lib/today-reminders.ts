@@ -1,5 +1,5 @@
 import { OCCASION_ICONS } from '@/lib/constants';
-import { occasionHeadline, occasionRelation } from '@/lib/occasion-text';
+import { occasionCategory, occasionContact, occasionKeyOf, occasionTitle } from '@/lib/occasion-details';
 import { classifyDate, type ReminderGroup, type ReminderTiming, daysBetweenDates } from '@/lib/dateHelpers';
 import { monthlySponsorEvent, nextOccurrence, occasionEvent, occursOn, recurrenceBadge, shiftDate, sponsorshipEvent, type RecurringEvent } from '@/lib/recurrence';
 import type { Donation, FamilyMember, MonthlySponsor, SpecialOccasion, Sponsor, SponsorshipRequest } from '@/lib/types';
@@ -21,6 +21,10 @@ export interface ReminderItem {
   recurrenceBadge: string | null;
   donationType: string | null;
   phone: string | null;
+  /** Who receives the message. */
+  contactName: string | null;
+  /** Remembrance: shown in a calm style, never as a celebration. */
+  calm: boolean;
   /** Whose day it is, for wishes (may differ from the sponsor, e.g. a child). */
   personName: string;
   familyMember: boolean;
@@ -35,6 +39,8 @@ export interface ReminderSources {
   occasions: SpecialOccasion[];
   familyMembers: FamilyMember[];
   monthlySponsors: MonthlySponsor[];
+  /** Icons by occasion type key, from Settings. */
+  occasionIcons?: Record<string, string>;
   donations: Donation[];
   requests: SponsorshipRequest[];
 }
@@ -72,7 +78,7 @@ export function buildReminderItems(src: ReminderSources, today: string): Reminde
   const birthdays = new Set<string>();
   const birthdayKey = (name: string, date: string) => `${name.trim().toLowerCase()}|${date.slice(5, 10)}`;
   const phoneOf = (s: Sponsor | null | undefined) => s?.phone || s?.whatsapp || null;
-  const base = { donationType: null, monthlySponsor: null, occasionRecord: null, donation: null, subtitle: null, familyMember: false, recurrenceBadge: null };
+  const base = { donationType: null, monthlySponsor: null, occasionRecord: null, donation: null, subtitle: null, familyMember: false, recurrenceBadge: null, contactName: null, calm: false };
   // Repeating events get a second key for their Upcoming entry; Done is stored under the plain key per date.
   const entryKey = (key: string, t: ReminderTiming) => (t.group === 'upcoming' ? `${key}#next` : key);
 
@@ -82,15 +88,18 @@ export function buildReminderItems(src: ReminderSources, today: string): Reminde
     const event = occasionEvent(o);
     const isBirthday = o.occasion_type === 'Birthday';
     if (isBirthday) birthdays.add(birthdayKey(o.person_name, o.occasion_date));
+    const contact = occasionContact(o, sponsor);
+    const category = occasionCategory(o);
     for (const t of eventTimings(event, today)) {
       items.push({
         ...base, key: entryKey(`occ:${o.id}`, t), kind: isBirthday ? 'birthday' : 'event', ...t,
-        icon: OCCASION_ICONS[o.occasion_type] || '⭐',
-        name: sponsor.full_name, occasion: occasionHeadline(o, sponsor.full_name),
-        subtitle: occasionRelation(o, sponsor.full_name),
+        icon: src.occasionIcons?.[occasionKeyOf(o)] || OCCASION_ICONS[o.occasion_type] || '⭐',
+        name: sponsor.full_name, occasion: occasionTitle(o, sponsor.full_name),
+        contactName: contact.name, calm: category === 'remembrance',
+        donationType: o.linked_donation_type || null,
         recurrenceBadge: event.recurrence === 'yearly' ? null : recurrenceBadge(event),
         personName: o.person_name, familyMember: !!o.family_member_id,
-        phone: phoneOf(sponsor), sponsor, occasionRecord: o,
+        phone: contact.phone, sponsor, occasionRecord: o,
       });
     }
   }

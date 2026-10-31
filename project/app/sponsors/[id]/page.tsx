@@ -18,6 +18,7 @@ import type { Sponsor, FamilyMember, SpecialOccasion, Donation, Interaction, Mes
 import { formatCurrency, formatDate, formatDateShort, OCCASION_ICONS, normalizeDonationType } from '@/lib/constants';
 import { nextOccurrenceOf, daysUntil, getRelativeDayLabel } from '@/lib/date-utils';
 import { occasionDateLine, occasionHeadline, occasionRelation } from '@/lib/occasion-text';
+import { occasionContact, occasionTitle } from '@/lib/occasion-details';
 import { SponsorForm } from '@/components/shared/SponsorForm';
 import { FamilyMemberForm } from '@/components/shared/FamilyMemberForm';
 import { OccasionForm } from '@/components/shared/OccasionForm';
@@ -270,7 +271,7 @@ export default function SponsorDetailPage() {
           <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="family">Family ({family.length})</TabsTrigger>
-            <TabsTrigger value="occasions">Special Days ({occasions.length})</TabsTrigger>
+            <TabsTrigger value="occasions">Occasions ({occasions.length})</TabsTrigger>
             <TabsTrigger value="sponsorships">Sponsorships ({requests.length})</TabsTrigger>
             <TabsTrigger value="donations">Donations ({donations.length})</TabsTrigger>
             <TabsTrigger value="timeline">Timeline</TabsTrigger>
@@ -370,10 +371,11 @@ export default function SponsorDetailPage() {
                         {OCCASION_ICONS[o.occasion_type] || '⭐'}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium">{occasionHeadline(o, sponsor.full_name)}</div>
-                        {occasionRelation(o, sponsor.full_name) && (
-                          <div className="text-sm">{occasionRelation(o, sponsor.full_name)}</div>
-                        )}
+                        <div className="font-medium">{occasionTitle(o, sponsor.full_name)}</div>
+                        <div className="text-sm">Contact: {occasionContact(o, sponsor).name}{occasionContact(o, sponsor).phone ? ` · ${occasionContact(o, sponsor).phone}` : ''}</div>
+                        {next && <div className="text-sm text-muted-foreground">Next: {next.date.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</div>}
+                        {o.linked_donation_type && <div className="text-sm text-muted-foreground">Donation: {o.linked_donation_type}{o.linked_donation_details ? ` (${o.linked_donation_details})` : ''}</div>}
+                        {o.thithi_note && <div className="text-sm text-muted-foreground">Thithi: {o.thithi_note}</div>}
                         <div className="text-sm text-muted-foreground">
                           {occasionDateLine(o, next?.occurrenceYear)}
                           {days !== null && days >= 0 && days <= 30 && (
@@ -534,7 +536,7 @@ export default function SponsorDetailPage() {
             <OccasionForm
               sponsorId={id}
               occasion={editingOccasion || undefined}
-              defaultPersonName={sponsor.full_name}
+              defaultPersonName={sponsor.full_name} sponsorPhone={sponsor.whatsapp || sponsor.phone} sponsorDob={sponsor.dob}
               onSaved={(o) => {
                 setOccasions((prev) => editingOccasion ? prev.map((x) => x.id === o.id ? o : x) : [...prev, o]);
                 setDialog(null);

@@ -56,7 +56,8 @@ export function getDueReminders(
     const recurrence = occasionEvent(occasion).recurrence;
     const repeats = recurrence === 'daily' || recurrence === 'weekly' || recurrence === 'monthly';
 
-    for (const daysBefore of repeats ? [0] : intervals) {
+    const days = repeats ? [0] : occasion.remind_days_before?.length ? occasion.remind_days_before : intervals;
+    for (const daysBefore of days) {
       const reminderDate = new Date(next.date);
       reminderDate.setDate(reminderDate.getDate() - daysBefore);
       if (toDateKey(reminderDate) !== todayKey) continue;

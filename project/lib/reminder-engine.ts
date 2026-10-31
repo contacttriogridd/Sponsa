@@ -9,7 +9,7 @@ import { runMonthlySponsorReminders } from '@/lib/monthly-reminder-engine';
 /** Maps an occasion to the approved template type used to wish the sponsor. */
 function templateTypeFor(occasion: SpecialOccasion): string | null {
   if (occasion.occasion_type === 'Birthday') {
-    return occasion.family_member_id ? 'Child Birthday' : 'Birthday Wish';
+    return occasion.family_member_id || occasion.occasion_type_key === 'family_birthday' ? 'Child Birthday' : 'Birthday Wish';
   }
   if (occasion.occasion_type === 'Wedding Anniversary' || occasion.occasion_type === 'Business Anniversary') {
     return 'Anniversary Wish';

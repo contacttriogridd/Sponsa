@@ -49,6 +49,8 @@ export interface OrganizationSettings {
 export interface Sponsor {
   id: string;
   sponsor_id: string | null;
+  /** Mr / Mrs / Ms / Dr; added by migration 00017. */
+  title?: 'Mr' | 'Mrs' | 'Ms' | 'Dr' | null;
   full_name: string;
   preferred_name: string | null;
   dob: string | null;
@@ -87,6 +89,18 @@ export interface FamilyMember {
 }
 
 export interface SpecialOccasion {
+  /** Added by migration 00017. Empty contact means the sponsor. */
+  occasion_type_key?: string | null;
+  occasion_name_en?: string | null;
+  occasion_name_ta?: string | null;
+  remind_days_before?: number[] | null;
+  contact_name?: string | null;
+  contact_title?: string | null;
+  contact_phone?: string | null;
+  contact_relation?: string | null;
+  linked_donation_type?: string | null;
+  linked_donation_details?: string | null;
+  thithi_note?: string | null;
   id: string;
   sponsor_id: string;
   family_member_id: string | null;
@@ -334,6 +348,8 @@ export interface MessageLog {
   type_label: string | null;
   related_event_id: string | null;
   related_donation_id: string | null;
+  occasion_id?: string | null;
+  occasion_type?: string | null;
   occurrence_date: string;
   message_text: string;
   recipient: 'sponsor' | 'admin';
