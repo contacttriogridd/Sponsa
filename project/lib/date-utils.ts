@@ -9,7 +9,11 @@ export function getNextOccurrence(
   recurring: boolean,
   from: Date = new Date()
 ): { date: Date; occurrenceYear: number } | null {
-  const base = typeof occasionDate === 'string' ? new Date(occasionDate) : occasionDate;
+  // A plain YYYY-MM-DD is that calendar day, not midnight UTC (which shifts the day in some timezones).
+  const plain = typeof occasionDate === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(occasionDate) : null;
+  const base = plain
+    ? new Date(Number(plain[1]), Number(plain[2]) - 1, Number(plain[3]))
+    : typeof occasionDate === 'string' ? new Date(occasionDate) : occasionDate;
   const today = new Date(from.getFullYear(), from.getMonth(), from.getDate());
 
   if (!recurring) {

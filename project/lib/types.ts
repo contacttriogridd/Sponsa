@@ -19,9 +19,8 @@ export interface OrganizationSettings {
   org_name_ta?: string | null;
   /** Added by migration 00011: days before a star day / payment day to remind. */
   star_reminder_days?: number | null;
-  /** Thank-you message templates; added by migration 00013 (null = default text). */
-  thank_you_template_en?: string | null;
-  thank_you_template_ta?: string | null;
+  /** Donation thank-you template; added by migration 00014 (null = built-in text). */
+  thank_you_template?: string | null;
   logo_url: string | null;
   phone: string | null;
   email: string | null;

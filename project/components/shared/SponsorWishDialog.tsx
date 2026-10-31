@@ -11,7 +11,8 @@ import { renderTemplate } from '@/lib/templates';
 import { loadWishContext, type WishContext } from '@/lib/star-wish';
 import type { MessageTemplate, SpecialOccasion, Sponsor } from '@/lib/types';
 
-const STAR_TYPES = ['Star Day Wish', 'Star Day Upcoming', 'Star Day Today'];
+// Star-day wishes and donation thank-yous have their own dialogs.
+const STAR_TYPES = ['Star Day Wish', 'Star Day Upcoming', 'Star Day Today', 'Thank You'];
 
 /** Template that fits an occasion: birthday, child's birthday or anniversary wish. */
 function defaultTemplateFor(templates: MessageTemplate[], occasion?: SpecialOccasion | null): MessageTemplate | undefined {
@@ -30,10 +31,12 @@ interface SponsorWishDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSent?: () => void;
+  /** Skip the contact log (for a person with no sponsor record). */
+  skipLog?: boolean;
 }
 
 /** Send Wish from the sponsor drawer: choose a template, edit, then WhatsApp or copy; logged as an interaction. */
-export function SponsorWishDialog({ sponsor, occasion, occasionDate, open, onOpenChange, onSent }: SponsorWishDialogProps) {
+export function SponsorWishDialog({ sponsor, occasion, occasionDate, open, onOpenChange, onSent, skipLog }: SponsorWishDialogProps) {
   const { appUser } = useAuth();
   const [ctx, setCtx] = useState<WishContext | null>(null);
   const [templateId, setTemplateId] = useState('');
@@ -64,6 +67,7 @@ export function SponsorWishDialog({ sponsor, occasion, occasionDate, open, onOpe
   }, [ctx, template, sponsor, occasion, occasionDate]);
 
   async function log(channel: 'whatsapp' | 'copy') {
+    if (skipLog) { onSent?.(); return; }
     await Promise.all([
       supabase.from('interactions').insert({
         sponsor_id: sponsor.id,

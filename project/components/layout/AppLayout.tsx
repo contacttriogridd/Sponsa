@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, Calendar, Bell, HandHeart, Gift,
@@ -19,6 +19,7 @@ import {
 import { NotificationBell } from '@/components/shared/NotificationBell';
 import { runReminderEngineOncePerDay } from '@/lib/reminder-engine';
 import { DrawerHost } from '@/components/shared/DrawerHost';
+import { loadReminderData, useLiveRefresh } from '@/lib/today-reminders-store';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard, Users, Calendar, Bell, HandHeart, Gift, BarChart3, Settings, Star,
@@ -60,6 +61,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (appUser) runReminderEngineOncePerDay(appUser.id);
   }, [appUser]);
+
+  // Red badge on Dashboard: today's reminders not yet marked done.
+  const [todayCount, setTodayCount] = useState(0);
+  const refreshTodayCount = useCallback(() => {
+    if (!appUser) return;
+    loadReminderData()
+      .then((d) => setTodayCount(d.items.filter((i) => i.group === 'today' && !d.done.has(i.key)).length))
+      .catch(() => {});
+  }, [appUser]);
+  useEffect(() => { refreshTodayCount(); }, [refreshTodayCount]);
+  useLiveRefresh(refreshTodayCount);
 
   if (loading || !appUser) {
     return (
@@ -105,6 +117,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             >
               <Icon className="h-4 w-4 shrink-0" />
               {item.label}
+              {item.href === '/dashboard' && todayCount > 0 && (
+                <span className="ml-auto min-w-5 h-5 px-1 rounded-full bg-destructive text-white text-xs flex items-center justify-center">{todayCount}</span>
+              )}
             </Link>
           );
         })}
@@ -217,7 +232,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   active ? 'text-primary' : 'text-muted-foreground'
                 )}
               >
-                <item.icon className="h-5 w-5" />
+                <span className="relative">
+                  <item.icon className="h-5 w-5" />
+                  {item.href === '/dashboard' && todayCount > 0 && (
+                    <span className="absolute -top-1.5 -right-2 min-w-4 h-4 px-0.5 rounded-full bg-destructive text-white text-[10px] flex items-center justify-center">{todayCount}</span>
+                  )}
+                </span>
                 <span className="text-xs font-medium">{item.label}</span>
               </Link>
             );

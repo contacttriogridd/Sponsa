@@ -13,17 +13,10 @@ import { organizationNamesFrom, DEFAULT_ORGANIZATION_NAMES, type OrganizationNam
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { whatsappNumber } from '@/lib/star-wish';
 import {
-  THANK_YOU_CHANNEL_LABELS, buildEmailUrl, buildSmsUrl, buildThankYouMessage, thankYouTemplatesFrom, thankYouVariables,
-  type ThankYouChannel, type ThankYouLanguage, type ThankYouTemplates,
+  THANK_YOU_CHANNEL_LABELS, buildEmailUrl, buildSmsUrl, donationSummary, fillTemplate, thankYouData, thankYouTemplateFrom,
+  type ThankYouChannel,
 } from '@/lib/thank-you';
-import { cn } from '@/lib/utils';
 import type { Donation, Sponsor } from '@/lib/types';
-
-const LANGUAGES: { value: ThankYouLanguage; label: string }[] = [
-  { value: 'en', label: 'English' },
-  { value: 'ta', label: 'தமிழ் Tamil' },
-  { value: 'both', label: 'Both' },
-];
 
 interface ThankYouDialogProps {
   sponsor: Sponsor;
@@ -34,15 +27,14 @@ interface ThankYouDialogProps {
 }
 
 /**
- * "Send Thank You Message" for a donation: generated English / Tamil / both
- * text (editable), signed with {{organization_name}}, sent by WhatsApp, SMS
- * or email, or copied. Every send marks the donation as thanked, logs a
+ * "Send Thank You Message" for a donation: the thank-you template filled from
+ * the donation record, shown in an editable box, sent by WhatsApp, SMS or
+ * email, or copied. Every send marks the donation as thanked, logs a
  * timeline entry and updates the sponsor's last contact date.
  */
 export function ThankYouDialog({ sponsor, donation, onOpenChange, onSent }: ThankYouDialogProps) {
   const { appUser } = useAuth();
-  const [language, setLanguage] = useState<ThankYouLanguage>('both');
-  const [templates, setTemplates] = useState<ThankYouTemplates | null>(null);
+  const [template, setTemplate] = useState<string | null>(null);
   const [organization, setOrganization] = useState<OrganizationNames>(DEFAULT_ORGANIZATION_NAMES);
   const [text, setText] = useState('');
   const [copied, setCopied] = useState(false);
@@ -50,22 +42,22 @@ export function ThankYouDialog({ sponsor, donation, onOpenChange, onSent }: Than
   // Organization names and saved templates, loaded when the dialog opens.
   useEffect(() => {
     if (!donation) return;
-    setLanguage('both'); setCopied(false);
+    setCopied(false);
     let cancelled = false;
     (async () => {
       const { data } = await supabase.from('organization_settings').select('*').limit(1).maybeSingle();
       if (cancelled) return;
       setOrganization(organizationNamesFrom(data));
-      setTemplates(thankYouTemplatesFrom(data));
+      setTemplate(thankYouTemplateFrom(data));
     })();
     return () => { cancelled = true; };
   }, [donation]);
 
-  // (Re)generate the message when the language or data changes.
+  // Fill the template once its data has loaded.
   useEffect(() => {
-    if (!donation || !templates) return;
-    setText(buildThankYouMessage(language, templates, thankYouVariables(sponsor, donation), organization));
-  }, [language, templates, organization, sponsor, donation]);
+    if (!donation || !template) return;
+    setText(fillTemplate(template, thankYouData(sponsor, donation, organization)));
+  }, [template, organization, sponsor, donation]);
 
   const phone = sponsor.whatsapp || sponsor.phone;
   const smsPhone = sponsor.phone || sponsor.whatsapp;
@@ -133,40 +125,22 @@ export function ThankYouDialog({ sponsor, donation, onOpenChange, onSent }: Than
     );
   }
 
-  const summary = donation ? thankYouVariables(sponsor, donation) : null;
-
   return (
     <Dialog open={!!donation} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Send Thank You Message</DialogTitle>
         </DialogHeader>
-        {donation && summary && (
+        {donation && (
           <div className="space-y-4">
             <div className="p-3 rounded-lg bg-muted text-sm">
               <div className="font-medium">{sponsor.full_name}</div>
-              <div className="text-muted-foreground">{summary.amount} · {summary.date} · {summary.donation_type}</div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Language</Label>
-              <div className="inline-flex rounded-lg border border-border p-0.5 bg-muted/40">
-                {LANGUAGES.map((l) => (
-                  <button
-                    key={l.value}
-                    type="button"
-                    onClick={() => setLanguage(l.value)}
-                    className={cn('px-3 py-1 text-sm rounded-md transition-colors', language === l.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
-                  >
-                    {l.label}
-                  </button>
-                ))}
-              </div>
+              <div className="text-muted-foreground">{donationSummary(donation)}</div>
             </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="thank-you-text">Message</Label>
-              {templates ? (
+              {template ? (
                 <Textarea id="thank-you-text" value={text} onChange={(e) => setText(e.target.value)} rows={14} className="text-sm leading-relaxed" />
               ) : (
                 <div className="h-72 rounded-md bg-muted animate-pulse" />
@@ -181,7 +155,7 @@ export function ThankYouDialog({ sponsor, donation, onOpenChange, onSent }: Than
                   <MessageSquare className="h-4 w-4 mr-1.5" />, 'No phone number saved for this sponsor')}
                 {sendAction('email', email ? buildEmailUrl(email, text) : null,
                   <Mail className="h-4 w-4 mr-1.5" />, 'No email address saved for this sponsor')}
-                <Button variant="outline" onClick={copy} disabled={!templates}>
+                <Button variant="outline" onClick={copy} disabled={!template}>
                   {copied ? <Check className="h-4 w-4 mr-1.5" /> : <Copy className="h-4 w-4 mr-1.5" />}{copied ? 'Copied' : 'Copy'}
                 </Button>
                 <Button variant="ghost" onClick={() => onOpenChange(false)}>Skip</Button>
