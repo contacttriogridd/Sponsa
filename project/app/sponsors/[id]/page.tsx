@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { supabase } from '@/lib/supabase/client';
 import type { Sponsor, FamilyMember, SpecialOccasion, Donation, Interaction, SponsorshipRequest } from '@/lib/types';
 import { formatCurrency, formatDate, formatDateShort, OCCASION_ICONS, normalizeDonationType } from '@/lib/constants';
-import { getNextOccurrence, daysUntil, getRelativeDayLabel } from '@/lib/date-utils';
+import { nextOccurrenceOf, daysUntil, getRelativeDayLabel } from '@/lib/date-utils';
 import { occasionDateLine, occasionHeadline, occasionRelation } from '@/lib/occasion-text';
 import { SponsorForm } from '@/components/shared/SponsorForm';
 import { FamilyMemberForm } from '@/components/shared/FamilyMemberForm';
@@ -119,7 +119,7 @@ export default function SponsorDetailPage() {
   const nextOccasion = occasions
     .filter((o) => o.active)
     .map((o) => {
-      const next = getNextOccurrence(o.occasion_date, o.recurring_yearly);
+      const next = nextOccurrenceOf(o);
       if (!next) return null;
       return { occasion: o, ...next, days: daysUntil(next.date) };
     })
@@ -354,7 +354,7 @@ export default function SponsorDetailPage() {
               </Card>
             ) : (
               occasions.map((o) => {
-                const next = getNextOccurrence(o.occasion_date, o.recurring_yearly);
+                const next = nextOccurrenceOf(o);
                 const days = next ? daysUntil(next.date) : null;
                 return (
                   <Card key={o.id} className={`p-4 ${!o.active ? 'opacity-50' : ''}`}>

@@ -16,7 +16,7 @@ import { OccasionForm } from '@/components/shared/OccasionForm';
 import { SponsorWishDialog } from '@/components/shared/SponsorWishDialog';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
-import { getNextOccurrence, daysUntil } from '@/lib/date-utils';
+import { nextOccurrenceOf, daysUntil } from '@/lib/date-utils';
 import { occasionHeadline, occasionRelation } from '@/lib/occasion-text';
 import { OCCASION_ICONS, SPONSORSHIP_STATUS_LABELS, formatCurrency, formatDateShort, normalizeDonationType } from '@/lib/constants';
 import { STARS } from '@/lib/natchathiram';
@@ -107,7 +107,7 @@ export function SponsorDetailDrawer({ sponsorId, occasionId, open }: { sponsorId
     const now = new Date();
     const days: UpcomingDay[] = [];
     for (const o of next.occasions) {
-      const n = getNextOccurrence(o.occasion_date, o.recurring_yearly, now);
+      const n = nextOccurrenceOf(o, now);
       if (!n) continue;
       days.push({
         key: o.id,

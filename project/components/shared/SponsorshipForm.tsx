@@ -13,6 +13,7 @@ import type { Sponsor, SponsorshipRequest, SpecialOccasion } from '@/lib/types';
 import { DONATION_TYPES, FOOD_TYPES, SPONSORSHIP_STATUSES, SPONSORSHIP_STATUS_LABELS, formatDateShort, normalizeDonationType } from '@/lib/constants';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { useAuth } from '@/lib/auth-context';
+import { RepeatFields, repeatPayload, type RepeatValue } from './RepeatFields';
 import { renderTemplate } from '@/lib/templates';
 import { useOrganizationNames } from '@/lib/use-organization-names';
 
@@ -81,6 +82,12 @@ Warm regards,
     message: buildMessage(initialType),
   });
 
+  const [repeat, setRepeat] = useState<RepeatValue>({
+    recurrence: request?.recurrence || 'none',
+    weekdays: request?.weekdays || [],
+    day_of_month: request?.day_of_month ? String(request.day_of_month) : '',
+    end_date: request?.end_date || '',
+  });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -117,6 +124,7 @@ Warm regards,
   }
 
   async function handleSubmit() {
+    if (repeat.recurrence !== 'none' && !form.special_date) { setError('Choose a Special Date for the repeat to start from.'); return; }
     setBusy(true); setError('');
 
     const payload = {
@@ -125,6 +133,7 @@ Warm regards,
       type: form.type,
       occasion_name: form.occasion_name || null,
       special_date: form.special_date || null,
+      ...repeatPayload(repeat, form.special_date || null),
       requested_amount: form.requested_amount ? Number(form.requested_amount) : null,
       food_type: isFood ? form.food_type || null : null,
       people_count: form.people_count ? Number(form.people_count) : null,
@@ -212,6 +221,7 @@ Warm regards,
           <Label>Special Date</Label>
           <DatePicker value={form.special_date} onChange={(v) => set('special_date', v)} />
         </div>
+        <RepeatFields value={repeat} onChange={setRepeat} />
         <div className="space-y-1.5">
           <Label>{form.type === 'Money' ? 'Requested Amount (₹)' : 'Estimated Value (₹)'}</Label>
           <Input type="number" value={form.requested_amount} onChange={(e) => set('requested_amount', e.target.value)} placeholder={form.type === 'Money' ? '15000' : 'Optional'} />

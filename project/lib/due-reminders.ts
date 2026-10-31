@@ -1,5 +1,6 @@
 import type { Sponsor, SpecialOccasion } from '@/lib/types';
-import { getNextOccurrence } from '@/lib/date-utils';
+import { nextOccurrenceOf } from '@/lib/date-utils';
+import { occasionEvent } from '@/lib/recurrence';
 import { OCCASION_ICONS } from '@/lib/constants';
 import { occasionHeadline, occasionRelation } from '@/lib/occasion-text';
 
@@ -49,10 +50,13 @@ export function getDueReminders(
     const sponsor = sponsorMap.get(occasion.sponsor_id);
     if (!sponsor) continue;
 
-    const next = getNextOccurrence(occasion.occasion_date, occasion.recurring_yearly, today);
+    const next = nextOccurrenceOf(occasion, today);
     if (!next) continue;
+    // A daily, weekly or monthly event reminds on the day only, not 7/3/1 days ahead as well.
+    const recurrence = occasionEvent(occasion).recurrence;
+    const repeats = recurrence === 'daily' || recurrence === 'weekly' || recurrence === 'monthly';
 
-    for (const daysBefore of intervals) {
+    for (const daysBefore of repeats ? [0] : intervals) {
       const reminderDate = new Date(next.date);
       reminderDate.setDate(reminderDate.getDate() - daysBefore);
       if (toDateKey(reminderDate) !== todayKey) continue;

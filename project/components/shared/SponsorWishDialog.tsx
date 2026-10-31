@@ -19,7 +19,7 @@ function defaultTemplateFor(templates: MessageTemplate[], occasion?: SpecialOcca
   let type = 'Birthday Wish';
   if (occasion?.occasion_type === 'Birthday' && occasion.family_member_id) type = 'Child Birthday';
   else if (occasion && /Anniversary/.test(occasion.occasion_type) && occasion.occasion_type !== 'Death Anniversary') type = 'Anniversary Wish';
-  else if (occasion?.occasion_type === 'Death Anniversary') type = 'Follow-up'; // remembrance: no celebratory wish by default
+  else if (occasion && occasion.occasion_type !== 'Birthday') type = 'Follow-up'; // remembrance and other events: no birthday wording
   return templates.find((t) => t.type === type) || templates[0];
 }
 

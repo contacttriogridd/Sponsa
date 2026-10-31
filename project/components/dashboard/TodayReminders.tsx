@@ -98,6 +98,7 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
                 <span className="text-xl leading-none mt-0.5">{item.icon}</span>
                 <div className="flex-1 min-w-0">
                   <button type="button" onClick={open} className="font-medium hover:text-primary text-left">{item.name}</button>
+                  {item.recurrenceBadge && <Badge variant="secondary" className="ml-2 text-xs font-normal">{item.recurrenceBadge}</Badge>}
                   <div className="text-sm text-muted-foreground">
                     {item.occasion}{item.subtitle ? ` · ${item.subtitle}` : ''}
                     {item.donationType ? ` · ${normalizeDonationType(item.donationType)}` : ''}
@@ -142,9 +143,11 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
     : null;
   // Birthdays stored only as a date of birth have no occasion row; describe them for the template.
   const wishOccasion = wish
-    ? wish.occasionRecord || (wish.kind === 'birthday'
-      ? ({ occasion_type: 'Birthday', person_name: wish.personName, family_member_id: wish.familyMember ? wish.key : null } as SpecialOccasion)
-      : null)
+    ? wish.occasionRecord || ({
+      occasion_type: wish.kind === 'birthday' ? 'Birthday' : 'Other',
+      person_name: wish.personName,
+      family_member_id: wish.familyMember ? wish.key : null,
+    } as SpecialOccasion)
     : null;
 
   return (

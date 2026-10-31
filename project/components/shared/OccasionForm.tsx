@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/lib/supabase/client';
 import type { SpecialOccasion } from '@/lib/types';
 import { OCCASION_TYPES, RELATIONSHIPS } from '@/lib/constants';
+import { RepeatFields, repeatPayload, type RepeatValue } from './RepeatFields';
 
 interface OccasionFormProps {
   sponsorId: string;
@@ -28,9 +29,14 @@ export function OccasionForm({ sponsorId, occasion, defaultPersonName, onSaved, 
     relationship: occasion?.relationship || 'Self',
     occasion_type: occasion?.occasion_type || 'Birthday',
     occasion_date: occasion?.occasion_date || '',
-    recurring_yearly: occasion?.recurring_yearly ?? true,
     active: occasion?.active ?? true,
     notes: occasion?.notes || '',
+  });
+  const [repeat, setRepeat] = useState<RepeatValue>({
+    recurrence: occasion?.recurrence || ((occasion?.recurring_yearly ?? true) ? 'yearly' : 'none'),
+    weekdays: occasion?.weekdays || [],
+    day_of_month: occasion?.day_of_month ? String(occasion.day_of_month) : '',
+    end_date: occasion?.end_date || '',
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -48,7 +54,8 @@ export function OccasionForm({ sponsorId, occasion, defaultPersonName, onSaved, 
       relationship: form.relationship || null,
       occasion_type: form.occasion_type,
       occasion_date: form.occasion_date,
-      recurring_yearly: form.recurring_yearly,
+      recurring_yearly: repeat.recurrence === 'yearly',
+      ...repeatPayload(repeat, form.occasion_date),
       active: form.active,
       notes: form.notes || null,
       is_auto_generated: false,
@@ -100,16 +107,13 @@ export function OccasionForm({ sponsorId, occasion, defaultPersonName, onSaved, 
           <Label>Date <span className="text-destructive">*</span></Label>
           <DatePicker value={form.occasion_date} onChange={(v) => set('occasion_date', v)} />
         </div>
+        <RepeatFields value={repeat} onChange={setRepeat} />
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Notes</Label>
           <Textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={2} placeholder="Any notes..." />
         </div>
       </div>
       <div className="flex flex-wrap gap-6">
-        <div className="flex items-center gap-2">
-          <Switch id="recurring" checked={form.recurring_yearly} onCheckedChange={(v) => set('recurring_yearly', v)} />
-          <Label htmlFor="recurring" className="cursor-pointer">Recurring yearly</Label>
-        </div>
         <div className="flex items-center gap-2">
           <Switch id="active" checked={form.active} onCheckedChange={(v) => set('active', v)} />
           <Label htmlFor="active" className="cursor-pointer">Active</Label>

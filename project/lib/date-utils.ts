@@ -1,4 +1,5 @@
 import type { SpecialOccasion, Sponsor, UpcomingOccasion } from './types';
+import { nextOccurrence, occasionEvent } from './recurrence';
 
 /**
  * Calculate the next annual occurrence of a recurring date.
@@ -53,6 +54,22 @@ export function getNextOccurrence(
   return { date: nextDate, occurrenceYear: nextDate.getFullYear() };
 }
 
+/** Next date of a special occasion, including daily, weekly and monthly repeats. */
+export function nextOccurrenceOf(
+  occasion: SpecialOccasion,
+  from: Date = new Date()
+): { date: Date; occurrenceYear: number } | null {
+  const event = occasionEvent(occasion);
+  if (event.recurrence === 'none' || (event.recurrence === 'yearly' && !event.end_date)) {
+    return getNextOccurrence(occasion.occasion_date, occasion.recurring_yearly || event.recurrence === 'yearly', from);
+  }
+  const key = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`;
+  const next = nextOccurrence(event, key);
+  if (!next) return null;
+  const [y, m, d] = next.split('-').map(Number);
+  return { date: new Date(y, m - 1, d), occurrenceYear: y };
+}
+
 /**
  * Calculate days until a date (0 = today, 1 = tomorrow, etc.)
  */
@@ -80,7 +97,7 @@ export function getUpcomingOccasions(
     const sponsor = sponsorMap.get(occasion.sponsor_id);
     if (!sponsor || sponsor.status === 'archived') continue;
 
-    const next = getNextOccurrence(occasion.occasion_date, occasion.recurring_yearly, from);
+    const next = nextOccurrenceOf(occasion, from);
     if (!next) continue;
 
     const days = daysUntil(next.date, from);

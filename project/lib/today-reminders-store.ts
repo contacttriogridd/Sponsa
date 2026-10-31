@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { getTodayIST, msUntilNextMidnightIST } from '@/lib/dateHelpers';
 import { buildReminderItems, type ReminderItem } from '@/lib/today-reminders';
+import { shiftDate } from '@/lib/recurrence';
 import type { Donation, FamilyMember, MonthlySponsor, SpecialOccasion, Sponsor, SponsorshipRequest } from '@/lib/types';
 
 export interface ReminderData {
@@ -34,9 +35,13 @@ async function fetchData(today: string): Promise<ReminderData> {
     supabase.from('family_members').select('*'),
     supabase.from('monthly_sponsors').select('*').eq('status', 'active'),
     supabase.from('donations').select('*').order('donation_date', { ascending: false }).limit(500),
-    supabase.from('sponsorship_requests').select('*').eq('special_date', today),
+    supabase.from('sponsorship_requests').select('*').or(`special_date.gte.${shiftDate(today, -7)},recurrence.in.(daily,weekly,monthly,yearly)`),
     supabase.from('reminder_completions').select('item_key').eq('reminder_date', today),
   ]);
+  // Before migration 00015 there is no recurrence column to filter on.
+  const requests = r.error
+    ? (await supabase.from('sponsorship_requests').select('*').gte('special_date', shiftDate(today, -7))).data
+    : r.data;
   const donations = (d.data || []) as Donation[];
   const latestDonation = new Map<string, Donation>();
   for (const x of donations) if (!latestDonation.has(x.sponsor_id)) latestDonation.set(x.sponsor_id, x);
@@ -48,7 +53,7 @@ async function fetchData(today: string): Promise<ReminderData> {
       familyMembers: (f.data || []) as FamilyMember[],
       monthlySponsors: m.error ? [] : (m.data || []) as MonthlySponsor[],
       donations,
-      requests: (r.data || []) as SponsorshipRequest[],
+      requests: (requests || []) as SponsorshipRequest[],
     }, today),
     latestDonation,
     done: new Set([...(c.error ? [] : (c.data || []).map((x) => x.item_key as string)), ...localDone(today)]),

@@ -24,7 +24,11 @@ function Row({ item, muted }: { item: ReminderItem; muted?: boolean }) {
       <span className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-lg shrink-0">{item.icon}</span>
       <span className="flex-1 min-w-0">
         <span className="block font-medium truncate">{item.occasion}</span>
-        <span className="block text-sm text-muted-foreground truncate">{item.subtitle || `Sponsor: ${item.name}`} · {dateLabel(item.date)} · {when(item.days)}</span>
+        <span className="block text-sm text-muted-foreground truncate">
+          {item.recurrenceBadge
+            ? `${item.recurrenceBadge} · Next: ${dateLabel(item.date)} · ${item.name}`
+            : `${item.subtitle || `Sponsor: ${item.name}`} · ${dateLabel(item.date)} · ${when(item.days)}`}
+        </span>
       </span>
     </button>
   );

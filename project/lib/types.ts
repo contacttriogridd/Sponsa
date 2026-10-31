@@ -1,3 +1,5 @@
+import type { Recurrence } from './recurrence';
+
 export type UserRole = 'admin' | 'collector' | 'staff' | 'viewer';
 
 export interface AppUser {
@@ -86,6 +88,12 @@ export interface SpecialOccasion {
   occasion_type: string;
   occasion_date: string;
   recurring_yearly: boolean;
+  /** Repeat settings; added by migration 00015. */
+  recurrence?: Recurrence | null;
+  weekdays?: number[] | null;
+  day_of_month?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
   is_auto_generated: boolean;
   active: boolean;
   notes: string | null;
@@ -124,6 +132,13 @@ export interface SponsorshipRequest {
   occasion_id: string | null;
   occasion_name: string | null;
   special_date: string | null;
+  /** Repeat settings; added by migration 00015. */
+  recurrence?: Recurrence | null;
+  weekdays?: number[] | null;
+  day_of_month?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  active?: boolean | null;
   /** Missing until migration 00006 is applied; null means an older food request. */
   type?: string | null;
   requested_amount: number | null;
