@@ -83,12 +83,19 @@ export default function ReportsPage() {
   }
 
   async function exportDonations() {
-    const { data } = await supabase
+    let { data, error } = await supabase
       .from('donations')
-      .select('*, sponsors(full_name)')
+      .select('*, sponsors(full_name), monthly_sponsors(name)')
       .order('donation_date', { ascending: false });
+    if (error) {
+      // Before migration 00018 there is no monthly sponsor link.
+      ({ data } = await supabase.from('donations').select('*, sponsors(full_name)').order('donation_date', { ascending: false }));
+    }
     if (data) {
-      const flat = data.map((d) => ({ ...d, sponsor_name: (d.sponsors as any)?.full_name, sponsors: undefined }));
+      const flat = data.map((d: any) => ({
+        ...d, sponsor_name: d.sponsors?.full_name || d.monthly_sponsors?.name, sponsor_type: d.sponsor_type || 'regular',
+        sponsors: undefined, monthly_sponsors: undefined,
+      }));
       downloadCSV(flat, 'donations.csv');
     }
   }

@@ -16,10 +16,12 @@ interface ThankYouDialogProps {
   /** Reminder this came from, so the dashboard card can show it was sent today. */
   relatedEventId?: string | null;
   occurrenceDate?: string | null;
+  /** Sponsor record for the log; null for a monthly sponsor. Defaults to sponsor.id. */
+  logSponsorId?: string | null;
 }
 
 /** Send Thanks for a donation: the shared Send Message modal, pre-filled from the donation record. */
-export function ThankYouDialog({ sponsor, donation, onOpenChange, onSent, relatedEventId, occurrenceDate }: ThankYouDialogProps) {
+export function ThankYouDialog({ sponsor, donation, onOpenChange, onSent, relatedEventId, occurrenceDate, logSponsorId }: ThankYouDialogProps) {
   const [text, setText] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,7 +41,7 @@ export function ThankYouDialog({ sponsor, donation, onOpenChange, onSent, relate
       open={!!donation}
       onOpenChange={onOpenChange}
       title="Send Thank You Message"
-      sponsorId={sponsor.id}
+      sponsorId={logSponsorId === undefined ? sponsor.id : logSponsorId}
       sponsorName={sponsor.full_name}
       phone={sponsor.whatsapp || sponsor.phone}
       extraChannels={{ smsPhone: sponsor.phone || sponsor.whatsapp, email: sponsor.email }}

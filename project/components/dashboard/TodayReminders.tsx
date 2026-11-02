@@ -45,7 +45,7 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
   const { appUser } = useAuth();
   const [localDone, setLocalDone] = useState<Record<string, boolean>>({});
   const [wish, setWish] = useState<ReminderItem | null>(null);
-  const [thanks, setThanks] = useState<{ sponsor: Sponsor; donation: Donation; eventKey: string } | null>(null);
+  const [thanks, setThanks] = useState<{ sponsor: Sponsor; donation: Donation; eventKey: string; logSponsorId?: string | null } | null>(null);
   const [canAsk, setCanAsk] = useState(false);
   const announced = useRef<string | null>(null);
   const [settings, setSettings] = useState<MessagingSettings>(messagingSettingsFrom(null));
@@ -141,9 +141,16 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={!donation || !item.sponsor}
+                  disabled={!donation || (!item.sponsor && !item.monthlySponsor)}
                   title={donation ? undefined : 'No donation recorded for this person yet'}
-                  onClick={() => { if (donation && item.sponsor) setThanks({ sponsor: item.sponsor, donation, eventKey: item.key }); }}
+                  onClick={() => {
+                    if (!donation) return;
+                    if (item.sponsor) setThanks({ sponsor: item.sponsor, donation, eventKey: item.key });
+                    else if (item.monthlySponsor) {
+                      const m = item.monthlySponsor;
+                      setThanks({ sponsor: { id: m.id, full_name: m.name, preferred_name: null, phone: m.phone, whatsapp: null, email: null } as Sponsor, donation, eventKey: item.key, logSponsorId: null });
+                    }
+                  }}
                 >
                   <Heart className="h-3.5 w-3.5 mr-1.5" />Send Thanks
                 </Button>
@@ -230,6 +237,7 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
           sponsor={thanks.sponsor}
           donation={thanks.donation}
           relatedEventId={thanks.eventKey}
+          logSponsorId={thanks.logSponsorId}
           occurrenceDate={data?.today}
           onOpenChange={(o) => { if (!o) setThanks(null); }}
           onSent={onChanged}

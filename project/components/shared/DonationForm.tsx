@@ -35,6 +35,8 @@ const DESCRIPTION_HINTS: Record<string, string> = {
 
 interface DonationFormProps {
   sponsorId: string;
+  /** 'monthly' when sponsorId is a monthly sponsor. */
+  sponsorType?: 'regular' | 'monthly';
   sponsorName?: string;
   sponsorshipRequestId?: string;
   occasionId?: string;
@@ -45,7 +47,7 @@ interface DonationFormProps {
 }
 
 export function DonationForm({
-  sponsorId, sponsorName, sponsorshipRequestId, occasionId, occasionName,
+  sponsorId, sponsorType = 'regular', sponsorName, sponsorshipRequestId, occasionId, occasionName,
   donation, onSaved, onCancel,
 }: DonationFormProps) {
   const { appUser } = useAuth();
@@ -80,8 +82,11 @@ export function DonationForm({
     if (form.amount && isNaN(Number(form.amount))) { setError('Enter a valid value.'); return; }
     setBusy(true); setError('');
 
+    const monthly = sponsorType === 'monthly';
     const payload = {
-      sponsor_id: sponsorId,
+      // A monthly sponsor's donation links to monthly_sponsors instead.
+      sponsor_id: monthly ? null : sponsorId,
+      ...(monthly ? { sponsor_type: 'monthly', monthly_sponsor_id: sponsorId } : {}),
       sponsorship_request_id: sponsorshipRequestId || null,
       occasion_id: occasionId || null,
       occasion_name: form.occasion_name || null,
@@ -113,6 +118,8 @@ export function DonationForm({
       setBusy(false);
       if (err) { setError('Unable to save donation. Please try again.'); return; }
       const newDonation = data as Donation;
+
+      if (monthly) { onSaved(newDonation); return; }
 
       // Update sponsor totals
       const { data: sponsor } = await supabase.from('sponsors').select('total_donations,people_helped').eq('id', sponsorId).single();

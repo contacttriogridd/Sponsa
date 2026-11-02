@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { supabase } from '@/lib/supabase/client';
 
 export type DeletableRecord =
-  | { kind: 'donation'; id: string; sponsor_id: string; amount: number | null; people_helped: number | null; label: string }
+  | { kind: 'donation'; id: string; sponsor_id: string | null; amount: number | null; people_helped: number | null; label: string }
   | { kind: 'sponsorship'; id: string; label: string };
 
 interface DeleteRecordDialogProps {
@@ -33,7 +33,7 @@ export function DeleteRecordDialog({ record, onOpenChange, onDeleted }: DeleteRe
     if (!data?.length) { setBusy(false); setError(`Only admins can delete ${NOUN[record.kind]}s.`); return; }
 
     // Recording a donation added to the sponsor's running totals, so take it back off.
-    if (record.kind === 'donation') {
+    if (record.kind === 'donation' && record.sponsor_id) {
       const { data: sponsor } = await supabase.from('sponsors').select('total_donations,people_helped').eq('id', record.sponsor_id).single();
       if (sponsor) {
         await supabase.from('sponsors').update({

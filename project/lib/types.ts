@@ -175,7 +175,10 @@ export interface SponsorshipRequest {
 export interface Donation {
   id: string;
   donation_id: string | null;
+  /** Null for a monthly sponsor's donation (migration 00018). */
   sponsor_id: string;
+  sponsor_type?: 'regular' | 'monthly' | null;
+  monthly_sponsor_id?: string | null;
   sponsorship_request_id: string | null;
   occasion_id: string | null;
   occasion_name: string | null;

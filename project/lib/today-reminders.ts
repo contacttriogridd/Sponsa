@@ -139,9 +139,19 @@ export function buildReminderItems(src: ReminderSources, today: string): Reminde
     }
   }
 
+  const monthlyById = new Map(src.monthlySponsors.map((m) => [m.id, m]));
   for (const d of src.donations) {
     if (d.donation_date !== today) continue;
-    const sponsor = sponsorById.get(d.sponsor_id);
+    const monthly = d.monthly_sponsor_id ? monthlyById.get(d.monthly_sponsor_id) : undefined;
+    if (monthly) {
+      items.push({
+        ...base, key: `don:${d.id}`, kind: 'donation', group: 'today', date: today, days: 0, icon: '🎁',
+        name: monthly.name, occasion: d.occasion_name || 'Donation today', donationType: d.type || 'Food',
+        personName: monthly.name, contactName: monthly.name, phone: monthly.phone, sponsor: null, monthlySponsor: monthly, donation: d,
+      });
+      continue;
+    }
+    const sponsor = d.sponsor_id ? sponsorById.get(d.sponsor_id) : undefined;
     if (!sponsor) continue;
     items.push({
       ...base, key: `don:${d.id}`, kind: 'donation', group: 'today', date: today, days: 0, icon: '🎁',

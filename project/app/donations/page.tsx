@@ -14,7 +14,8 @@ import { DeleteRecordDialog, type DeletableRecord } from '@/components/shared/De
 import { ThankYouDialog } from '@/components/shared/ThankYouDialog';
 import { ThanksStatusButton } from '@/components/shared/ThanksStatusButton';
 import { toast } from 'sonner';
-import { useDrawerDataChanged } from '@/lib/drawer-store';
+import { openMonthlySponsorDrawer, useDrawerDataChanged } from '@/lib/drawer-store';
+import { SponsorPicker, type PickerOption } from '@/components/shared/SponsorPicker';
 import { thanksStatus } from '@/lib/messaging';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
@@ -31,18 +32,29 @@ export default function DonationsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedSponsorId, setSelectedSponsorId] = useState('');
+  const [sponsorType, setSponsorType] = useState<'regular' | 'monthly'>('regular');
+  const [regularOptions, setRegularOptions] = useState<PickerOption[]>([]);
+  const [monthlyOptions, setMonthlyOptions] = useState<PickerOption[]>([]);
   const [logs, setLogs] = useState<MessageLog[]>([]);
   const [thanksFilter, setThanksFilter] = useState<'all' | 'sent' | 'pending'>('all');
   const [thanking, setThanking] = useState<any | null>(null);
 
   const load = useCallback(async () => {
-    const [d, s, l] = await Promise.all([
-      supabase.from('donations').select('*, sponsors(id, full_name, preferred_name, phone, whatsapp, email)').order('donation_date', { ascending: false }),
-      supabase.from('sponsors').select('id,full_name').eq('status', 'active').order('full_name'),
+    const sponsorCols = 'id, full_name, preferred_name, phone, whatsapp, email';
+    const [d, s, m, l] = await Promise.all([
+      supabase.from('donations').select(`*, sponsors(${sponsorCols}), monthly_sponsors(id, name, phone)`).order('donation_date', { ascending: false }),
+      supabase.from('sponsors').select('id, full_name, phone, whatsapp').eq('status', 'active').order('full_name'),
+      supabase.from('monthly_sponsors').select('id, name, phone').order('name'),
       supabase.from('message_logs').select('*').eq('message_type', 'donation_thanks'),
     ]);
-    setItems(d.data || []);
+    // Before migration 00018 there is no monthly sponsor link to join.
+    const donations = d.error
+      ? (await supabase.from('donations').select(`*, sponsors(${sponsorCols})`).order('donation_date', { ascending: false })).data
+      : d.data;
+    setItems(donations || []);
     setSponsors((s.data || []) as Sponsor[]);
+    setRegularOptions((s.data || []).map((x) => ({ id: x.id, name: x.full_name, phone: x.phone || x.whatsapp })));
+    setMonthlyOptions((m.error ? [] : m.data || []).map((x) => ({ id: x.id, name: x.name, phone: x.phone })));
     setLogs((l.error ? [] : l.data || []) as MessageLog[]);
     setLoading(false);
   }, []);
@@ -59,7 +71,8 @@ export default function DonationsPage() {
       (filter === 'week' && (now.getTime() - date.getTime()) < 7 * 86400000) ||
       (filter === 'month' && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()) ||
       (filter === 'year' && date.getFullYear() === now.getFullYear());
-    const matchQuery = !query || d.sponsors?.full_name?.toLowerCase().includes(query.toLowerCase()) || d.occasion_name?.toLowerCase().includes(query.toLowerCase());
+    const donorName: string = d.sponsors?.full_name || d.monthly_sponsors?.name || '';
+    const matchQuery = !query || donorName.toLowerCase().includes(query.toLowerCase()) || d.occasion_name?.toLowerCase().includes(query.toLowerCase());
     const thanked = thanksStatus(d, logs).sent;
     const matchThanks = thanksFilter === 'all' || (thanksFilter === 'sent' ? thanked : !thanked);
     return matchFilter && matchQuery && matchThanks;
@@ -68,7 +81,13 @@ export default function DonationsPage() {
   const total = filtered.reduce((a, d) => a + Number(d.amount || 0), 0);
   const people = filtered.reduce((a, d) => a + Number(d.people_helped || 0), 0);
 
-  const selectedSponsor = sponsors.find((s) => s.id === selectedSponsorId);
+  const options = sponsorType === 'monthly' ? monthlyOptions : regularOptions;
+  const selectedSponsor = options.find((o) => o.id === selectedSponsorId);
+
+  /** Who to thank for a donation: the sponsor, or the monthly sponsor (not logged against a sponsor record). */
+  const thanksTarget = (d: any) => (d.monthly_sponsors
+    ? { sponsor: { id: d.monthly_sponsors.id, full_name: d.monthly_sponsors.name, preferred_name: null, phone: d.monthly_sponsors.phone, whatsapp: null, email: null } as Sponsor, logSponsorId: null }
+    : { sponsor: d.sponsors as Sponsor, logSponsorId: undefined });
 
   return (
     <AppLayout>
@@ -143,9 +162,16 @@ export default function DonationsPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <Link href={`/sponsors/${d.sponsor_id}`} className="font-semibold hover:text-primary">
-                          {d.sponsors?.full_name || 'Unknown'}
-                        </Link>
+                        {d.monthly_sponsors ? (
+                          <button type="button" onClick={() => openMonthlySponsorDrawer(d.monthly_sponsors.id)} className="font-semibold hover:text-primary text-left">
+                            {d.monthly_sponsors.name}
+                          </button>
+                        ) : (
+                          <Link href={`/sponsors/${d.sponsor_id}`} className="font-semibold hover:text-primary">
+                            {d.sponsors?.full_name || 'Unknown'}
+                          </Link>
+                        )}
+                        {d.sponsor_type === 'monthly' && <Badge variant="outline" className="text-xs">Monthly</Badge>}
                         <Badge variant="outline" className="text-xs">{normalizeDonationType(d.type)}</Badge>
                         {d.food_type && <Badge variant="outline" className="text-xs">{d.food_type}</Badge>}
                       </div>
@@ -167,7 +193,7 @@ export default function DonationsPage() {
                       <Button variant="ghost" size="icon" className="text-destructive" aria-label="Delete donation"
                         onClick={() => setDeleting({
                           kind: 'donation', id: d.id, sponsor_id: d.sponsor_id, amount: d.amount, people_helped: d.people_helped,
-                          label: `${d.sponsors?.full_name || 'Sponsor'} — ${normalizeDonationType(d.type)} donation on ${formatDate(d.donation_date)}`,
+                          label: `${d.sponsors?.full_name || d.monthly_sponsors?.name || 'Sponsor'} — ${normalizeDonationType(d.type)} donation on ${formatDate(d.donation_date)}`,
                         })}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -193,30 +219,40 @@ export default function DonationsPage() {
           <DialogHeader><DialogTitle>Record Donation</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Select Sponsor</label>
-              <select
-                className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
-                value={selectedSponsorId}
-                onChange={(e) => setSelectedSponsorId(e.target.value)}
-              >
-                <option value="">Choose a sponsor...</option>
-                {sponsors.map((s) => (
-                  <option key={s.id} value={s.id}>{s.full_name}</option>
+              <label className="text-sm font-medium">Sponsor Type</label>
+              <div className="flex gap-1">
+                {([['regular', 'Sponsors'], ['monthly', 'Monthly Sponsors']] as const).map(([key, label]) => (
+                  <Button key={key} type="button" size="sm" variant={sponsorType === key ? 'secondary' : 'ghost'} onClick={() => { setSponsorType(key); setSelectedSponsorId(''); }}>
+                    {label}
+                  </Button>
                 ))}
-              </select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Select Sponsor</label>
+              <SponsorPicker
+                options={options}
+                value={selectedSponsorId}
+                onChange={setSelectedSponsorId}
+                placeholder={sponsorType === 'monthly' ? 'Choose a monthly sponsor...' : 'Choose a sponsor...'}
+              />
             </div>
             {selectedSponsor && (
               <DonationForm
+                key={`${sponsorType}-${selectedSponsorId}`}
                 sponsorId={selectedSponsorId}
-                sponsorName={selectedSponsor.full_name}
+                sponsorType={sponsorType}
+                sponsorName={selectedSponsor.name}
                 onSaved={(saved) => {
                   setShowForm(false);
                   const donor = selectedSponsor;
+                  const monthly = sponsorType === 'monthly';
                   setSelectedSponsorId('');
                   load();
                   toast.success('Donation saved — Send Thanks now?');
                   setTimeout(() => {
-                    supabase.from('sponsors').select('*').eq('id', donor.id).single().then(({ data }) => setThanking({ ...saved, sponsors: data }));
+                    if (monthly) setThanking({ ...saved, monthly_sponsors: { id: donor.id, name: donor.name, phone: donor.phone } });
+                    else supabase.from('sponsors').select('*').eq('id', donor.id).single().then(({ data }) => setThanking({ ...saved, sponsors: data }));
                   }, 400);
                 }}
                 onCancel={() => { setShowForm(false); setSelectedSponsorId(''); }}
@@ -225,9 +261,10 @@ export default function DonationsPage() {
           </div>
         </DialogContent>
       </Dialog>
-      {thanking?.sponsors && (
+      {(thanking?.sponsors || thanking?.monthly_sponsors) && (
         <ThankYouDialog
-          sponsor={thanking.sponsors}
+          sponsor={thanksTarget(thanking).sponsor}
+          logSponsorId={thanksTarget(thanking).logSponsorId}
           donation={thanking as Donation}
           onOpenChange={(o) => { if (!o) setThanking(null); }}
           onSent={() => load()}
