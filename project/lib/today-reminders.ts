@@ -2,7 +2,7 @@ import { OCCASION_ICONS } from '@/lib/constants';
 import { occasionCategory, occasionContact, occasionKeyOf, occasionTitle } from '@/lib/occasion-details';
 import { classifyDate, type ReminderGroup, type ReminderTiming, daysBetweenDates } from '@/lib/dateHelpers';
 import { monthlySponsorEvent, nextOccurrence, occasionEvent, occursOn, recurrenceBadge, shiftDate, sponsorshipEvent, type RecurringEvent } from '@/lib/recurrence';
-import type { Donation, FamilyMember, MonthlySponsor, SpecialOccasion, Sponsor, SponsorshipRequest } from '@/lib/types';
+import type { Donation, FamilyMember, MonthlyFamilyMember, MonthlySponsor, SpecialOccasion, Sponsor, SponsorshipRequest } from '@/lib/types';
 
 // Pure (no Supabase): turns stored records into dashboard reminders.
 
@@ -39,6 +39,7 @@ export interface ReminderSources {
   occasions: SpecialOccasion[];
   familyMembers: FamilyMember[];
   monthlySponsors: MonthlySponsor[];
+  monthlyFamily?: MonthlyFamilyMember[];
   /** Icons by occasion type key, from Settings. */
   occasionIcons?: Record<string, string>;
   donations: Donation[];
@@ -126,6 +127,13 @@ export function buildReminderItems(src: ReminderSources, today: string): Reminde
     if (m.status !== 'active') continue;
     const linked = m.sponsor_id ? sponsorById.get(m.sponsor_id) || null : null;
     addBirthday(`ms:${m.id}`, m.name, m.dob, { phone: m.phone || phoneOf(linked), sponsor: linked, monthlySponsor: m });
+    for (const f of (src.monthlyFamily || []).filter((x) => x.monthly_sponsor_id === m.id)) {
+      const relation = f.relationship === 'Other' ? f.relationship_other?.trim() || 'Family member' : f.relationship;
+      addBirthday(`msfam:${f.id}`, f.name, f.dob, {
+        name: m.name, occasion: `${f.name}'s Birthday (${relation} of ${m.name})`, subtitle: `${relation} of ${m.name}`,
+        familyMember: true, contactName: m.name, phone: f.phone || m.phone || phoneOf(linked), sponsor: linked, monthlySponsor: m,
+      });
+    }
     // Their donation day each month, from the payment day.
     if (m.payment_day) {
       const event = monthlySponsorEvent(m);

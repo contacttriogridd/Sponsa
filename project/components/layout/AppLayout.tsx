@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, Calendar, Bell, HandHeart, Gift,
-  BarChart3, Settings, Menu, Search, Plus, LogOut, ChevronLeft, Star,
+  BarChart3, Settings, Menu, Search, Plus, LogOut, ChevronLeft, Star, Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
@@ -23,13 +23,14 @@ import { MessageConfirmHost } from '@/components/shared/MessageConfirmHost';
 import { loadReminderData, useLiveRefresh } from '@/lib/today-reminders-store';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  LayoutDashboard, Users, Calendar, Bell, HandHeart, Gift, BarChart3, Settings, Star,
+  LayoutDashboard, Users, Calendar, Bell, HandHeart, Gift, BarChart3, Settings, Star, Sparkles,
 };
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
   { label: 'Sponsors', href: '/sponsors', icon: 'Users' },
   { label: 'Monthly Sponsors', href: '/monthly-sponsors', icon: 'Star' },
+  { label: 'Festival Wishes', href: '/festival-wishes', icon: 'Sparkles' },
   { label: 'Calendar', href: '/calendar', icon: 'Calendar' },
   { label: 'Reminders', href: '/reminders', icon: 'Bell' },
   { label: 'Sponsorships', href: '/sponsorships', icon: 'HandHeart' },

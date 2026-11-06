@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { MonthlySponsorForm } from '@/components/monthly/MonthlySponsorForm';
 import { PaymentDialog } from '@/components/monthly/PaymentDialog';
 import { SendWishButton } from '@/components/monthly/SendWishButton';
+import { FamilyMembersSection } from '@/components/monthly/FamilyMembersSection';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDateShort } from '@/lib/constants';
 import { RAASIS, STARS, astroLabel } from '@/lib/natchathiram';
@@ -168,6 +169,8 @@ export function MonthlySponsorDetailDrawer({ monthlyId }: { monthlyId: string })
                   </div>
                 </div>
               </Section>
+
+              <FamilyMembersSection monthlySponsorId={sponsor.id} />
 
               <Section title="Star days">
                 {starDays === null ? <div className="h-24 rounded-xl bg-muted animate-pulse" /> : next ? (

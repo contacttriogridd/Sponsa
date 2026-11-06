@@ -307,6 +307,8 @@ export interface MonthlySponsor {
   address?: string | null;
   /** Preferred payment mode; added by migration 00012. */
   payment_mode?: PaymentMode | null;
+  /** Set when this entry is a family member's star day, built from monthly_family_members. */
+  family_of?: { parentId: string; parentName: string; relationship: string; memberId: string } | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -340,7 +342,7 @@ export interface MonthlyWishLog {
   sent_at: string;
 }
 
-export type MessageType = 'birthday_wish' | 'anniversary_wish' | 'event_wish' | 'donation_thanks' | 'admin_notification' | 'admin_daily_summary';
+export type MessageType = 'birthday_wish' | 'anniversary_wish' | 'event_wish' | 'donation_thanks' | 'admin_notification' | 'admin_daily_summary' | 'festival_wish';
 
 export interface MessageLog {
   id: string;
@@ -353,6 +355,12 @@ export interface MessageLog {
   related_donation_id: string | null;
   occasion_id?: string | null;
   occasion_type?: string | null;
+  /** Festival sends (migration 00019). */
+  monthly_sponsor_id?: string | null;
+  festival_key?: string | null;
+  festival_year?: number | null;
+  sponsor_category?: 'general' | 'monthly' | null;
+  language?: 'en' | 'ta' | 'both' | null;
   occurrence_date: string;
   message_text: string;
   recipient: 'sponsor' | 'admin';
@@ -365,4 +373,20 @@ export interface MessageLog {
   sent_by: string | null;
   sent_by_name: string | null;
   sent_at: string;
+}
+
+export interface MonthlyFamilyMember {
+  id: string;
+  monthly_sponsor_id: string;
+  name: string;
+  relationship: string;
+  relationship_other: string | null;
+  star: number | null;
+  raasi: number | null;
+  dob: string | null;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }

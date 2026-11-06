@@ -10,13 +10,13 @@ import { supabase } from '@/lib/supabase/client';
 import { STARS } from '@/lib/natchathiram';
 import { formatCurrency } from '@/lib/constants';
 import {
-  DEFAULT_STAR_REMINDER_DAYS, formatIstTime, formatStarDate, monthKey, paymentsDue, shiftMonth, todayIst, upcomingStarDays, whenLabel,
+  familyStarSubjects, parentIdOf, subjectLabel, DEFAULT_STAR_REMINDER_DAYS, formatIstTime, formatStarDate, monthKey, paymentsDue, shiftMonth, todayIst, upcomingStarDays, whenLabel,
   type PaymentDue, type UpcomingStarDay,
 } from '@/lib/monthly-sponsors';
 import { addDays } from '@/lib/star-days';
 import { loadStarCalendar } from '@/lib/star-calendar-store';
 import { openMonthlySponsorDrawer } from '@/lib/drawer-store';
-import type { MonthlyPayment, MonthlySponsor } from '@/lib/types';
+import type { MonthlyFamilyMember, MonthlyPayment, MonthlySponsor } from '@/lib/types';
 
 /**
  * Reminders page section: star days within the reminder window (default
@@ -41,7 +41,8 @@ export function MonthlySponsorReminders() {
       setDues(paymentsDue(sponsors, (payments || []) as MonthlyPayment[], today, lead));
       if (sponsors.some((s) => s.star != null)) {
         const rows = await loadStarCalendar(addDays(today, -1), addDays(today, lead));
-        setStarDays(upcomingStarDays(sponsors, rows, today, lead + 1));
+        const { data: members } = await supabase.from('monthly_family_members').select('*');
+        setStarDays(upcomingStarDays([...sponsors, ...familyStarSubjects(sponsors, (members || []) as MonthlyFamilyMember[])], rows, today, lead + 1));
       }
     })();
   }, []);
@@ -56,7 +57,7 @@ export function MonthlySponsorReminders() {
             <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-xl">⭐</div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <button type="button" onClick={() => openMonthlySponsorDrawer(u.sponsor.id)} className="font-semibold hover:text-primary text-left">{u.sponsor.name}&apos;s star day</button>
+                <button type="button" onClick={() => openMonthlySponsorDrawer(parentIdOf(u.sponsor))} className="font-semibold hover:text-primary text-left">{subjectLabel(u.sponsor)}&apos;s star day</button>
                 <Badge variant={u.daysUntil <= 1 ? 'destructive' : 'secondary'}>{whenLabel(u.daysUntil)}</Badge>
               </div>
               <p className="text-sm text-muted-foreground mt-1">{STARS[u.sponsor.star!].ta} ({STARS[u.sponsor.star!].en}) · {formatStarDate(u.occurrence.date)}</p>

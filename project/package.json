@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "node --import ./tests/register.mjs --test tests/recurrence.test.ts tests/messaging.test.ts tests/occasion.test.ts tests/event-categories.test.ts"
+    "test": "node --import ./tests/register.mjs --test tests/recurrence.test.ts tests/messaging.test.ts tests/occasion.test.ts tests/event-categories.test.ts tests/festival.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

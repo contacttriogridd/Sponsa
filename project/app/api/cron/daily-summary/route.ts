@@ -5,7 +5,7 @@ import { buildDailySummary, messagingSettingsFrom } from '@/lib/messaging';
 import { shiftDate } from '@/lib/recurrence';
 import { buildReminderItems } from '@/lib/today-reminders';
 import { sendWhatsAppText } from '@/lib/whatsapp-server';
-import type { Donation, FamilyMember, MonthlySponsor, SpecialOccasion, Sponsor, SponsorshipRequest } from '@/lib/types';
+import type { Donation, FamilyMember, MonthlyFamilyMember, MonthlySponsor, SpecialOccasion, Sponsor, SponsorshipRequest } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,19 +37,21 @@ export async function GET(request: NextRequest) {
     .eq('message_type', 'admin_daily_summary').eq('occurrence_date', today).in('status', ['opened', 'sent', 'delivered']).limit(1);
   if (existing?.length) return NextResponse.json({ skipped: 'Already sent today.' });
 
-  const [s, o, f, m, d, r] = await Promise.all([
+  const [s, o, f, m, d, r, mf] = await Promise.all([
     supabase.from('sponsors').select('*').eq('status', 'active'),
     supabase.from('special_occasions').select('*').eq('active', true),
     supabase.from('family_members').select('*'),
     supabase.from('monthly_sponsors').select('*').eq('status', 'active'),
     supabase.from('donations').select('*').eq('donation_date', today),
     supabase.from('sponsorship_requests').select('*').or(`special_date.gte.${shiftDate(today, -7)},recurrence.in.(daily,weekly,monthly,yearly)`),
+    supabase.from('monthly_family_members').select('*'),
   ]);
   const items = buildReminderItems({
     sponsors: (s.data || []) as Sponsor[],
     occasions: (o.data || []) as SpecialOccasion[],
     familyMembers: (f.data || []) as FamilyMember[],
     monthlySponsors: (m.data || []) as MonthlySponsor[],
+    monthlyFamily: (mf.error ? [] : mf.data || []) as MonthlyFamilyMember[],
     donations: (d.data || []) as Donation[],
     requests: (r.data || []) as SponsorshipRequest[],
   }, today);

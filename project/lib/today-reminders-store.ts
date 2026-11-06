@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase/client';
 import { getTodayIST, msUntilNextMidnightIST } from '@/lib/dateHelpers';
 import { buildReminderItems, type ReminderItem } from '@/lib/today-reminders';
 import { shiftDate } from '@/lib/recurrence';
-import type { Donation, FamilyMember, MessageLog, MonthlySponsor, SpecialOccasion, Sponsor, SponsorshipRequest } from '@/lib/types';
+import type { Donation, FamilyMember, MessageLog, MonthlyFamilyMember, MonthlySponsor, SpecialOccasion, Sponsor, SponsorshipRequest } from '@/lib/types';
 
 export interface ReminderData {
   today: string;
@@ -33,7 +33,7 @@ function localDone(today: string): string[] {
 let cache: { at: number; today: string; promise: Promise<ReminderData> } | null = null;
 
 async function fetchData(today: string): Promise<ReminderData> {
-  const [s, o, f, m, d, r, c, l, t] = await Promise.all([
+  const [s, o, f, m, d, r, c, l, t, mf] = await Promise.all([
     supabase.from('sponsors').select('*').eq('status', 'active'),
     supabase.from('special_occasions').select('*').eq('active', true),
     supabase.from('family_members').select('*'),
@@ -43,6 +43,7 @@ async function fetchData(today: string): Promise<ReminderData> {
     supabase.from('reminder_completions').select('item_key').eq('reminder_date', today),
     supabase.from('message_logs').select('*').eq('occurrence_date', today).order('sent_at', { ascending: false }),
     supabase.from('occasion_types').select('key, icon'),
+    supabase.from('monthly_family_members').select('*'),
   ]);
   // Before migration 00015 there is no recurrence column to filter on.
   const requests = r.error
@@ -67,6 +68,7 @@ async function fetchData(today: string): Promise<ReminderData> {
       occasions: (o.data || []) as SpecialOccasion[],
       familyMembers: (f.data || []) as FamilyMember[],
       monthlySponsors: m.error ? [] : (m.data || []) as MonthlySponsor[],
+      monthlyFamily: mf.error ? [] : (mf.data || []) as MonthlyFamilyMember[],
       occasionIcons: Object.fromEntries((t.error ? [] : t.data || []).map((x) => [x.key, x.icon])),
       donations,
       requests: (requests || []) as SponsorshipRequest[],

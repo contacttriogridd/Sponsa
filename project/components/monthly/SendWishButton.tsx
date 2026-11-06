@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { renderTemplate } from '@/lib/templates';
 import { STARS } from '@/lib/natchathiram';
-import { daysBetween, formatStarDate, todayIst, whenLabel } from '@/lib/monthly-sponsors';
+import { daysBetween, formatStarDate, todayIst, whenLabel, parentIdOf } from '@/lib/monthly-sponsors';
 import { loadWishContext, pickStarTemplate, starDayVariables, whatsappNumber, type WishContext } from '@/lib/star-wish';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { notifyDrawerDataChanged } from '@/lib/drawer-store';
@@ -61,7 +61,7 @@ export function SendWishButton({ sponsor, starDate, size = 'sm' }: SendWishButto
 
   async function logWish(channel: 'whatsapp' | 'copy', message: string) {
     await supabase.from('monthly_wish_log').insert({
-      monthly_sponsor_id: sponsor.id, star_date: starDate, template_type: composed?.type || null,
+      monthly_sponsor_id: parentIdOf(sponsor), star_date: starDate, template_type: composed?.type || null,
       channel, message, sent_by: appUser?.id || null,
     });
     notifyDrawerDataChanged();

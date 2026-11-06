@@ -22,7 +22,8 @@ import {
 import { addDays } from '@/lib/star-days';
 import { loadStarCalendar } from '@/lib/star-calendar-store';
 import { openMonthlySponsorDrawer, useDrawerDataChanged } from '@/lib/drawer-store';
-import type { MonthlyPayment, MonthlySponsor } from '@/lib/types';
+import type { MonthlyFamilyMember, MonthlyPayment, MonthlySponsor } from '@/lib/types';
+import { relationshipLabel } from '@/lib/festival';
 
 type Row = MonthlySponsor & { sponsors?: { full_name: string } | null };
 
@@ -39,12 +40,18 @@ export default function MonthlySponsorsPage() {
   const [editing, setEditing] = useState<Row | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [paying, setPaying] = useState<Row | null>(null);
+  const [family, setFamily] = useState<Map<string, MonthlyFamilyMember[]>>(new Map());
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const loadSponsors = useCallback(async () => {
     const { data, error } = await supabase.from('monthly_sponsors').select('*, sponsors(full_name)').order('name');
     if (error) { setNotReady(true); setLoading(false); return; }
     const rows = (data || []) as Row[];
     setSponsors(rows);
+    const { data: members } = await supabase.from('monthly_family_members').select('*').order('created_at');
+    const byParent = new Map<string, MonthlyFamilyMember[]>();
+    for (const m of (members || []) as MonthlyFamilyMember[]) byParent.set(m.monthly_sponsor_id, [...(byParent.get(m.monthly_sponsor_id) || []), m]);
+    setFamily(byParent);
     setLoading(false);
     // Next star day for each sponsor, from the cached star calendar (60 days covers two cycles).
     const calendar = await loadStarCalendar(addDays(today, -1), addDays(today, 60));
@@ -158,6 +165,11 @@ export default function MonthlySponsorsPage() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <button type="button" onClick={() => openMonthlySponsorDrawer(s.id)} className="font-semibold hover:text-primary text-left">{s.name}</button>
                               {s.status !== 'active' && <Badge variant="outline">{MONTHLY_STATUS_LABELS[s.status]}</Badge>}
+                              {(family.get(s.id)?.length || 0) > 0 && (
+                                <button type="button" onClick={() => setExpanded(expanded === s.id ? null : s.id)} aria-expanded={expanded === s.id}>
+                                  <Badge variant="secondary" className="font-normal">👨‍👩‍👧 {family.get(s.id)!.length}</Badge>
+                                </button>
+                              )}
                               {!isValidCombination(s.raasi, s.star) && (
                                 <Badge variant="outline" className="text-warning border-warning/40"><AlertTriangle className="h-3 w-3 mr-1" />Check Raasi/Star</Badge>
                               )}
@@ -171,6 +183,13 @@ export default function MonthlySponsorsPage() {
                               {s.sponsors?.full_name && <span>{s.relationship ? `${s.relationship} of ` : 'Related to '}{s.sponsors.full_name}</span>}
                               {s.payment_day && <span>Pays on day {s.payment_day}</span>}
                             </div>
+                            {expanded === s.id && (
+                              <ul className="text-xs text-muted-foreground mt-1.5 space-y-0.5">
+                                {family.get(s.id)!.map((m) => (
+                                  <li key={m.id}>{m.name} · {relationshipLabel(m)}{m.star != null ? ` · ${STARS[m.star].ta} (${STARS[m.star].en})` : ''}</li>
+                                ))}
+                              </ul>
+                            )}
                             {next && (
                               <div className="text-sm mt-1.5">
                                 ⭐ Next star day: <span className="font-medium">{formatStarDate(next.occurrence.date)}</span>{' '}

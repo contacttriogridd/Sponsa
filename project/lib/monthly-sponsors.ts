@@ -1,4 +1,4 @@
-import type { MonthlyPayment, MonthlySponsor } from '@/lib/types';
+import type { MonthlyFamilyMember, MonthlyPayment, MonthlySponsor } from '@/lib/types';
 import { RAASIS, STARS, raasisOfStar } from '@/lib/natchathiram';
 import { addDays, starDaysFor, type StarCalendarDay, type StarDayOccurrence } from '@/lib/star-days';
 import { formatCurrency } from '@/lib/constants';
@@ -130,4 +130,40 @@ export function whenLabel(daysUntil: number): string {
   if (daysUntil === 1) return 'Tomorrow';
   if (daysUntil < 0) return `${-daysUntil} day${daysUntil === -1 ? '' : 's'} overdue`;
   return `In ${daysUntil} days`;
+}
+
+/** The monthly sponsor record behind an entry (itself, or a family member's sponsor). */
+export function parentIdOf(sponsor: MonthlySponsor): string {
+  return sponsor.family_of?.parentId || sponsor.id;
+}
+
+/** "Priya (Daughter of Ravi)" for a family member, else the sponsor's name. */
+export function subjectLabel(sponsor: MonthlySponsor): string {
+  return sponsor.family_of ? `${sponsor.name} (${sponsor.family_of.relationship} of ${sponsor.family_of.parentName})` : sponsor.name;
+}
+
+/**
+ * Family members with a star, as entries alongside their monthly sponsor so
+ * star days, reminders and wishes include them. They use their own phone,
+ * else the sponsor's, and follow the sponsor's status.
+ */
+export function familyStarSubjects(sponsors: MonthlySponsor[], members: MonthlyFamilyMember[]): MonthlySponsor[] {
+  const byId = new Map(sponsors.map((s) => [s.id, s]));
+  const out: MonthlySponsor[] = [];
+  for (const m of members) {
+    const parent = byId.get(m.monthly_sponsor_id);
+    if (!parent || m.star == null) continue;
+    const relationship = m.relationship === 'Other' ? m.relationship_other?.trim() || 'Family member' : m.relationship;
+    out.push({
+      ...parent,
+      id: `${parent.id}:${m.id}`,
+      name: m.name,
+      phone: m.phone || parent.phone,
+      dob: m.dob,
+      star: m.star,
+      raasi: m.raasi,
+      family_of: { parentId: parent.id, parentName: parent.name, relationship, memberId: m.id },
+    });
+  }
+  return out;
 }

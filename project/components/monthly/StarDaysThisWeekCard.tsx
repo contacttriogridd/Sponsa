@@ -6,11 +6,11 @@ import { Card } from '@/components/ui/card';
 import { SendWishButton } from '@/components/monthly/SendWishButton';
 import { supabase } from '@/lib/supabase/client';
 import { STARS } from '@/lib/natchathiram';
-import { formatStarDate, todayIst, upcomingStarDays, whenLabel, type UpcomingStarDay } from '@/lib/monthly-sponsors';
+import { familyStarSubjects, formatStarDate, parentIdOf, subjectLabel, todayIst, upcomingStarDays, whenLabel, type UpcomingStarDay } from '@/lib/monthly-sponsors';
 import { addDays } from '@/lib/star-days';
 import { loadStarCalendar } from '@/lib/star-calendar-store';
 import { openMonthlySponsorDrawer } from '@/lib/drawer-store';
-import type { MonthlySponsor } from '@/lib/types';
+import type { MonthlyFamilyMember, MonthlySponsor } from '@/lib/types';
 
 /** Dashboard card: monthly sponsors whose star day falls in the next 7 days. */
 export function StarDaysThisWeekCard() {
@@ -21,7 +21,9 @@ export function StarDaysThisWeekCard() {
       const today = todayIst();
       const { data, error } = await supabase.from('monthly_sponsors').select('*').eq('status', 'active');
       if (error) { setItems([]); return; } // migration 00011 not applied yet
-      const sponsors = (data || []) as MonthlySponsor[];
+      const base = (data || []) as MonthlySponsor[];
+      const { data: members } = await supabase.from('monthly_family_members').select('*');
+      const sponsors = [...base, ...familyStarSubjects(base, (members || []) as MonthlyFamilyMember[])];
       if (!sponsors.some((s) => s.star != null)) { setItems([]); return; }
       const rows = await loadStarCalendar(addDays(today, -1), addDays(today, 6));
       setItems(upcomingStarDays(sponsors, rows, today, 7));
@@ -42,7 +44,7 @@ export function StarDaysThisWeekCard() {
           <div key={`${u.sponsor.id}-${u.occurrence.date}`} className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors">
             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-lg">⭐</div>
             <div className="flex-1 min-w-0">
-              <button type="button" onClick={() => openMonthlySponsorDrawer(u.sponsor.id)} className="font-medium truncate hover:text-primary text-left block max-w-full">{u.sponsor.name}</button>
+              <button type="button" onClick={() => openMonthlySponsorDrawer(parentIdOf(u.sponsor))} className="font-medium truncate hover:text-primary text-left block max-w-full">{subjectLabel(u.sponsor)}</button>
               <div className="text-sm text-muted-foreground truncate">
                 {STARS[u.sponsor.star!].ta} ({STARS[u.sponsor.star!].en}) · {formatStarDate(u.occurrence.date)} · {whenLabel(u.daysUntil)}
               </div>

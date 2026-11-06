@@ -12,12 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { SendWishButton } from '@/components/monthly/SendWishButton';
 import { supabase } from '@/lib/supabase/client';
 import { STARS, RAASIS, astroLabel } from '@/lib/natchathiram';
-import { effectiveRaasi, formatIstTime, formatStarDate, todayIst, upcomingStarDays, whenLabel, type UpcomingStarDay } from '@/lib/monthly-sponsors';
+import { effectiveRaasi, familyStarSubjects, formatIstTime, formatStarDate, parentIdOf, subjectLabel, todayIst, upcomingStarDays, whenLabel, type UpcomingStarDay } from '@/lib/monthly-sponsors';
 import { addDays, type StarCalendarDay } from '@/lib/star-days';
 import { loadStarCalendar } from '@/lib/star-calendar-store';
 import { openMonthlySponsorDrawer } from '@/lib/drawer-store';
 import { cn } from '@/lib/utils';
-import type { MonthlySponsor } from '@/lib/types';
+import type { MonthlyFamilyMember, MonthlySponsor } from '@/lib/types';
 
 const WEEKDAYS = [
   { ta: 'ஞாயிறு', en: 'Sun' }, { ta: 'திங்கள்', en: 'Mon' }, { ta: 'செவ்வாய்', en: 'Tue' }, { ta: 'புதன்', en: 'Wed' },
@@ -45,7 +45,9 @@ export default function StarCalendarPage() {
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from('monthly_sponsors').select('*').eq('status', 'active').order('name');
-      const list = (data || []) as MonthlySponsor[];
+      const base = (data || []) as MonthlySponsor[];
+      const { data: members } = await supabase.from('monthly_family_members').select('*');
+      const list = [...base, ...familyStarSubjects(base, (members || []) as MonthlyFamilyMember[])];
       setSponsors(list);
       const rows = await loadStarCalendar(addDays(today, -1), addDays(today, 29));
       setUpcoming(upcomingStarDays(list, rows, today, 30));
@@ -208,7 +210,7 @@ export default function StarCalendarPage() {
               {selectedSponsors.map((u) => (
                 <div key={u.sponsor.id} className="flex items-center gap-3 p-3 rounded-xl border border-border">
                   <div className="flex-1 min-w-0">
-                    <button type="button" onClick={() => { setSelected(null); openMonthlySponsorDrawer(u.sponsor.id); }} className="font-medium truncate hover:text-primary text-left">{u.sponsor.name}</button>
+                    <button type="button" onClick={() => { setSelected(null); openMonthlySponsorDrawer(parentIdOf(u.sponsor)); }} className="font-medium truncate hover:text-primary text-left">{subjectLabel(u.sponsor)}</button>
                     <div className="text-xs text-muted-foreground">{astroLabel(STARS[u.sponsor.star!])}</div>
                     {u.sponsor.phone && (
                       <a href={`tel:${u.sponsor.phone}`} className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{u.sponsor.phone}</a>
@@ -238,7 +240,7 @@ function UpcomingCard({ item }: { item: UpcomingStarDay }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <button type="button" onClick={() => openMonthlySponsorDrawer(sponsor.id)} className="font-semibold hover:text-primary text-left">{sponsor.name}</button>
+            <button type="button" onClick={() => openMonthlySponsorDrawer(parentIdOf(sponsor))} className="font-semibold hover:text-primary text-left">{subjectLabel(sponsor)}</button>
             <Badge variant={daysUntil <= 1 ? 'destructive' : 'secondary'}>{whenLabel(daysUntil)}</Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">

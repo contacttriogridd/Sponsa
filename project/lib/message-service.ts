@@ -21,6 +21,11 @@ export interface LogInput {
   relatedDonationId?: string | null;
   occasionId?: string | null;
   occasionType?: string | null;
+  monthlySponsorId?: string | null;
+  festivalKey?: string | null;
+  festivalYear?: number | null;
+  sponsorCategory?: 'general' | 'monthly' | null;
+  language?: 'en' | 'ta' | 'both' | null;
   occurrenceDate: string;
   messageText: string;
   recipient: 'sponsor' | 'admin';
@@ -105,6 +110,13 @@ export async function logMessage(input: LogInput): Promise<MessageLog | null> {
     related_donation_id: input.relatedDonationId || null,
     occasion_id: input.occasionId || null,
     occasion_type: input.occasionType || null,
+    ...(input.festivalKey ? {
+      monthly_sponsor_id: input.monthlySponsorId || null,
+      festival_key: input.festivalKey,
+      festival_year: input.festivalYear,
+      sponsor_category: input.sponsorCategory,
+      language: input.language,
+    } : {}),
     occurrence_date: input.occurrenceDate,
     message_text: input.messageText,
     recipient: input.recipient,

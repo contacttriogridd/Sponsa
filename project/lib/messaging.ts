@@ -59,6 +59,7 @@ export const MESSAGE_TYPE_LABELS: Record<MessageType, string> = {
   donation_thanks: 'Donation Thanks',
   admin_notification: 'Admin Notification',
   admin_daily_summary: 'Admin Daily Summary',
+  festival_wish: 'Festival Wish',
 };
 
 export const CHANNEL_LABELS: Record<MessageLog['channel'], string> = {
