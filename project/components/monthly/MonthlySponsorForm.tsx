@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePicker } from '@/components/shared/DatePicker';
 import { AstroCombobox } from '@/components/monthly/AstroCombobox';
+import { FamilyMembersSection, familyMemberRow, type FamilyMemberDraft } from '@/components/monthly/FamilyMembersSection';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { RAASIS, STARS, astroLabel, isValidCombination, padamNote, raasisOfStar, starsInRaasi } from '@/lib/natchathiram';
@@ -48,6 +49,7 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [familyDrafts, setFamilyDrafts] = useState<FamilyMemberDraft[]>([]);
   const [confirmInvalid, setConfirmInvalid] = useState(false);
 
   useEffect(() => {
@@ -92,6 +94,23 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
       sponsor_id: form.sponsor_id === NO_SPONSOR ? null : form.sponsor_id,
       relationship: form.sponsor_id === NO_SPONSOR ? null : form.relationship.trim() || null,
     };
+    // A new sponsor and their family save together in one transaction (migration 00020).
+    if (!sponsor) {
+      const sponsorRow = { ...payload, address: form.address.trim() || null, payment_mode: form.payment_mode === NO_MODE ? null : form.payment_mode, created_by: appUser?.id || null };
+      const { data, error: rpcErr } = await supabase.rpc('create_monthly_sponsor_with_family', {
+        p_sponsor: sponsorRow,
+        p_members: familyDrafts.map(({ localId: _l, ...m }) => familyMemberRow(m)),
+      });
+      if (!rpcErr) { setBusy(false); onSaved(data as MonthlySponsor); return; }
+      if (rpcErr.code !== 'PGRST202' || familyDrafts.length > 0) {
+        setBusy(false);
+        setError(rpcErr.code === 'PGRST202'
+          ? 'Saving with family members needs database migration 00020. Remove the family members to save now, or run the migration.'
+          : 'Unable to save. Nothing was saved — please try again.');
+        return;
+      }
+      // Before migration 00020, a sponsor without family members saves as before.
+    }
     const run = (p: Record<string, unknown>) => sponsor
       ? supabase.from('monthly_sponsors').update(p).eq('id', sponsor.id).select().single()
       : supabase.from('monthly_sponsors').insert({ ...p, created_by: appUser?.id || null }).select().single();
@@ -207,6 +226,10 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
+      {sponsor
+        ? <FamilyMembersSection monthlySponsorId={sponsor.id} />
+        : <FamilyMembersSection drafts={familyDrafts} onDraftsChange={setFamilyDrafts} />}
+
       <div className="flex gap-3">
         <Button onClick={save} disabled={busy}>
           <Save className="h-4 w-4 mr-2" />{busy ? 'Saving...' : confirmInvalid ? 'Save anyway' : sponsor ? 'Save Changes' : 'Add Monthly Sponsor'}

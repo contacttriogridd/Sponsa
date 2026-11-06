@@ -21,24 +21,47 @@ import type { MonthlyFamilyMember } from '@/lib/types';
 
 const EMPTY = { name: '', relationship: '', relationship_other: '', star: null as number | null, raasi: null as number | null, dob: '', phone: '', address: '', notes: '' };
 
-/** "Family Members / குடும்ப உறுப்பினர்கள்" in the monthly sponsor drawer. */
-export function FamilyMembersSection({ monthlySponsorId }: { monthlySponsorId: string }) {
-  const [members, setMembers] = useState<MonthlyFamilyMember[] | null>(null);
+/** A family member typed into the Add Monthly Sponsor form, saved with the sponsor. */
+export type FamilyMemberDraft = Omit<MonthlyFamilyMember, 'id' | 'monthly_sponsor_id' | 'created_at' | 'updated_at'> & { localId: string };
+
+/** Columns for monthly_family_members from a draft or saved member. */
+export function familyMemberRow(m: Omit<FamilyMemberDraft, 'localId'>) {
+  return {
+    name: m.name, relationship: m.relationship, relationship_other: m.relationship_other, star: m.star, raasi: m.raasi,
+    dob: m.dob, phone: m.phone, address: m.address, notes: m.notes,
+  };
+}
+
+type Props =
+  | { monthlySponsorId: string; drafts?: never; onDraftsChange?: never }
+  | { monthlySponsorId?: never; drafts: FamilyMemberDraft[]; onDraftsChange: (drafts: FamilyMemberDraft[]) => void };
+
+/**
+ * "Family Members / குடும்ப உறுப்பினர்கள்" for a monthly sponsor. With a
+ * sponsor ID, changes save straight away; in the Add form (drafts), they are
+ * kept until the sponsor is saved.
+ */
+export function FamilyMembersSection({ monthlySponsorId, drafts, onDraftsChange }: Props) {
+  const draftMode = !monthlySponsorId;
+  const [saved, setSaved] = useState<MonthlyFamilyMember[] | null>(null);
+  const members: (MonthlyFamilyMember | FamilyMemberDraft)[] | null = draftMode ? drafts! : saved;
+  const keyOf = (m: MonthlyFamilyMember | FamilyMemberDraft) => ('localId' in m ? m.localId : m.id);
   const [notReady, setNotReady] = useState(false);
-  const [editing, setEditing] = useState<MonthlyFamilyMember | 'new' | null>(null);
-  const [deleting, setDeleting] = useState<MonthlyFamilyMember | null>(null);
+  const [editing, setEditing] = useState<MonthlyFamilyMember | FamilyMemberDraft | 'new' | null>(null);
+  const [deleting, setDeleting] = useState<MonthlyFamilyMember | FamilyMemberDraft | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
+    if (!monthlySponsorId) return;
     const { data, error: err } = await supabase.from('monthly_family_members').select('*').eq('monthly_sponsor_id', monthlySponsorId).order('created_at');
-    if (err) { setNotReady(true); setMembers([]); return; }
-    setMembers((data || []) as MonthlyFamilyMember[]);
+    if (err) { setNotReady(true); setSaved([]); return; }
+    setSaved((data || []) as MonthlyFamilyMember[]);
   }, [monthlySponsorId]);
   useEffect(() => { load(); }, [load]);
 
-  function open(member: MonthlyFamilyMember | 'new') {
+  function open(member: MonthlyFamilyMember | FamilyMemberDraft | 'new') {
     setError('');
     setEditing(member);
     setForm(member === 'new' ? EMPTY : {
@@ -52,9 +75,7 @@ export function FamilyMembersSection({ monthlySponsorId }: { monthlySponsorId: s
     if (!form.relationship) { setError('Relationship is required.'); return; }
     if (form.star != null && !STARS[form.star]) { setError('Choose one of the 27 stars.'); return; }
     if (form.phone.trim() && !normalizeIndianNumber(form.phone)) { setError('Enter a valid 10-digit phone number.'); return; }
-    setBusy(true); setError('');
     const payload = {
-      monthly_sponsor_id: monthlySponsorId,
       name: form.name.trim(),
       relationship: form.relationship,
       relationship_other: form.relationship === 'Other' ? form.relationship_other.trim() || null : null,
@@ -65,8 +86,16 @@ export function FamilyMembersSection({ monthlySponsorId }: { monthlySponsorId: s
       address: form.address.trim() || null,
       notes: form.notes.trim() || null,
     };
+    if (draftMode) {
+      onDraftsChange!(editing === 'new'
+        ? [...drafts!, { ...payload, localId: `draft-${Date.now()}-${drafts!.length}` }]
+        : drafts!.map((d) => (d.localId === (editing as FamilyMemberDraft).localId ? { ...payload, localId: d.localId } : d)));
+      setEditing(null);
+      return;
+    }
+    setBusy(true); setError('');
     const { error: err } = editing === 'new'
-      ? await supabase.from('monthly_family_members').insert(payload)
+      ? await supabase.from('monthly_family_members').insert({ ...payload, monthly_sponsor_id: monthlySponsorId })
       : await supabase.from('monthly_family_members').update(payload).eq('id', (editing as MonthlyFamilyMember).id);
     setBusy(false);
     if (err) { setError('Unable to save. Please try again.'); return; }
@@ -77,6 +106,11 @@ export function FamilyMembersSection({ monthlySponsorId }: { monthlySponsorId: s
 
   async function remove() {
     if (!deleting) return;
+    if ('localId' in deleting) {
+      onDraftsChange!(drafts!.filter((d) => d.localId !== deleting.localId));
+      setDeleting(null);
+      return;
+    }
     await supabase.from('monthly_family_members').delete().eq('id', deleting.id);
     setDeleting(null);
     load();
@@ -90,11 +124,11 @@ export function FamilyMembersSection({ monthlySponsorId }: { monthlySponsorId: s
     <section className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Family Members / குடும்ப உறுப்பினர்கள்</h3>
-        {!notReady && <Button size="sm" variant="outline" onClick={() => open('new')}><Plus className="h-4 w-4 mr-1" />Add</Button>}
+        {!notReady && <Button type="button" size="sm" variant="outline" onClick={() => open('new')}><Plus className="h-4 w-4 mr-1" />Add Family Member</Button>}
       </div>
       {notReady && <p className="text-sm text-muted-foreground">Family members need database migration 00019.</p>}
       {members?.map((m) => (
-        <div key={m.id} className="rounded-xl border border-border p-3 flex items-start gap-3 text-sm">
+        <div key={keyOf(m)} className="rounded-xl border border-border p-3 flex items-start gap-3 text-sm">
           <div className="flex-1 min-w-0">
             <div className="font-medium">{m.name} <span className="text-muted-foreground font-normal">· {relationshipLabel(m)}</span></div>
             <div className="text-xs text-muted-foreground mt-0.5">
@@ -105,7 +139,12 @@ export function FamilyMembersSection({ monthlySponsorId }: { monthlySponsorId: s
           <Button variant="ghost" size="icon" className="text-destructive" aria-label={`Delete ${m.name}`} onClick={() => setDeleting(m)}><Trash2 className="h-4 w-4" /></Button>
         </div>
       ))}
-      {members?.length === 0 && !notReady && <p className="text-sm text-muted-foreground">No family members added.</p>}
+      {members?.length === 0 && !notReady && (
+        <div className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground space-y-2">
+          <p>No family members added yet / குடும்ப உறுப்பினர்கள் இன்னும் சேர்க்கப்படவில்லை</p>
+          <Button type="button" size="sm" variant="outline" onClick={() => open('new')}><Plus className="h-4 w-4 mr-1" />Add Family Member</Button>
+        </div>
+      )}
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -158,7 +197,7 @@ export function FamilyMembersSection({ monthlySponsorId }: { monthlySponsorId: s
             </div>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button onClick={save} disabled={busy}><Save className="h-4 w-4 mr-2" />{busy ? 'Saving...' : 'Save'}</Button>
+          <Button type="button" onClick={save} disabled={busy}><Save className="h-4 w-4 mr-2" />{busy ? 'Saving...' : draftMode ? 'Done' : 'Save'}</Button>
         </DialogContent>
       </Dialog>
 
@@ -166,7 +205,7 @@ export function FamilyMembersSection({ monthlySponsorId }: { monthlySponsorId: s
         open={!!deleting}
         onOpenChange={(o) => !o && setDeleting(null)}
         title="Delete family member?"
-        description={deleting ? `${deleting.name} will be removed from this monthly sponsor.` : ''}
+        description={deleting ? `${deleting.name} will be removed${'localId' in deleting ? '' : ' from this monthly sponsor'}.` : ''}
         confirmLabel="Delete"
         destructive
         onConfirm={remove}

@@ -43,7 +43,9 @@ export async function runMonthlySponsorReminders(currentUserId: string): Promise
     const star = STARS[u.sponsor.star!];
     reminders.push({
       sponsorId: parentIdOf(u.sponsor), familyMemberId: u.sponsor.family_of?.memberId, kind: 'star_day', target: u.occurrence.date, daysBefore: u.daysUntil,
-      title: `⭐ ${subjectLabel(u.sponsor)}'s star day (${star.ta} ${star.en}) is ${inDays(u.daysUntil)}`,
+      title: u.sponsor.family_of
+        ? `⭐ ${inDays(u.daysUntil) === 'today' ? 'Today is' : `${inDays(u.daysUntil)[0].toUpperCase()}${inDays(u.daysUntil).slice(1)}:`} the star day of ${subjectLabel(u.sponsor)} (${star.ta} ${star.en})`
+        : `⭐ ${u.sponsor.name}'s star day (${star.ta} ${star.en}) is ${inDays(u.daysUntil)}`,
       message: `${formatStarDate(u.occurrence.date)} · star from ${formatIstTime(u.occurrence.start)} to ${formatIstTime(u.occurrence.end)}. Send a wish from Monthly Sponsors.`,
     });
   }
