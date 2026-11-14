@@ -11,61 +11,120 @@ export const THANK_YOU_CHANNEL_LABELS: Record<ThankYouChannel, string> = {
   copy: 'Copy',
 };
 
-/** The one donation thank-you message; every screen fills this through fillTemplate. */
-export const THANK_YOU_TEMPLATE = `Dear {{donor_name}},
-Thank you for your generous donation of {{donation_type}} on {{donation_date}}.
-Your kindness helps us continue feeding the hungry and serving those in need.
-May Vallalar's blessings be with you and your family always.
+export type ThankYouLanguage = 'en' | 'ta';
+
+/** Built-in English thank-you note; the database copy (organization_settings.thank_you_template_en) wins. */
+export const THANK_YOU_TEMPLATE_EN = `🙏 Vanakkam {{sponsor_name}},
+
+On behalf of {{organization_name}}, we sincerely thank you for your generous donation of {{amount}} received on {{donation_date}}.
+
+Your kindness helps us continue our service of feeding the hungry, in the path shown by Vallalar. Every rupee you give reaches someone in need.
+
 With heartfelt gratitude,
+{{organization_name}}`;
 
-அருட்பெருஞ்ஜோதி அருட்பெருஞ்ஜோதி தனிப்பெருங்கருணை அருட்பெருஞ்ஜோதி
+/** Built-in Tamil thank-you note; the database copy (organization_settings.thank_you_template_ta) wins. */
+export const THANK_YOU_TEMPLATE_TA = `🙏  மக்கள் சேவையே மகேசன் சேவை {{sponsor_name}} அவர்களுக்கு வணக்கம் 
 
-அன்புள்ள திரு. {{donor_name}} அவர்களுக்கு,
-{{donation_date}} அன்று நீங்கள் வழங்கிய {{donation_purpose_ta}} நன்கொடைக்கு எங்களின் மனமார்ந்த நன்றிகள்.
-உங்கள் அன்பும் கருணையும் பசித்தோருக்கு உணவளிக்கும் எங்கள் சேவைக்கு பெரும் உறுதுணையாக உள்ளது.
-நீங்களும் உங்கள் அன்புக்குடும்பமும் எல்லாம் வல்ல இறையாற்றலின் கருணையினால் எவ்வகையேனும் ஏற்றமுடன் வாழ்க வளமுடன்.
+{{donation_date}} அன்று நீங்கள் வழங்கிய {{amount}} நன்கொடைக்கு {{organization_name}} சார்பாக எங்கள் மனமார்ந்த வாழ்த்துக்களையும் நன்றிகளையும் தெரிவித்துக் கொள்கிறோம்.
+
+வள்ளலார் காட்டிய வழியில் பசித்தவர்களுக்கு உணவளிக்கும் எங்கள் சேவையைத் தொடர உங்கள் மேலான உதவி பெரிதும் ஊக்கமளிக்கிறது. 
 
 நன்றியுடன்,
-{{organization_name}}
-({{organization_name_ta}})`;
+{{organization_name}}`;
+
+export const THANK_YOU_DEFAULTS: Record<ThankYouLanguage, string> = { en: THANK_YOU_TEMPLATE_EN, ta: THANK_YOU_TEMPLATE_TA };
+
+/** Placeholders offered in the template editor. */
+export const THANK_YOU_PLACEHOLDERS = ['{{sponsor_name}}', '{{amount}}', '{{donation_date}}', '{{organization_name}}'] as const;
 
 export const DEFAULT_DONATION_PURPOSE_TA = 'ஆதரவற்ற முதியவர்களுக்கான அன்னதான உணவு';
 export const THANK_YOU_EMAIL_SUBJECT = 'Thank you for your donation - VP TRUST';
 
-/** Fills {{placeholders}}; one with no value becomes empty, so raw placeholders never show. */
-export function fillTemplate(template: string, data: Record<string, string | null | undefined>): string {
-  return template
-    .replace(/\r\n?/g, '\n')
-    .replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, key: string) => data[key] ?? '');
+const PLACEHOLDER = /\{\{\s*(\w+)\s*\}\}/g;
+
+function normalizeLineBreaks(text: string): string {
+  return text.replace(/\r\n?/g, '\n');
 }
 
-/** The admin's saved template from organization_settings, or the built-in one. */
-export function thankYouTemplateFrom(row: { thank_you_template?: string | null } | null | undefined): string {
-  return row?.thank_you_template?.trim() || THANK_YOU_TEMPLATE;
+/** Fills {{placeholders}}; one with no value becomes empty, so raw placeholders never show. */
+export function fillTemplate(template: string, data: Record<string, string | null | undefined>): string {
+  return normalizeLineBreaks(template)
+    .replace(PLACEHOLDER, (_match, key: string) => data[key] ?? '');
+}
+
+/** Fills only the placeholders that have a value; any other stays as typed, for unfilledPlaceholders to catch. */
+export function fillKnown(template: string, data: Record<string, string | null | undefined>): string {
+  return normalizeLineBreaks(template)
+    .replace(PLACEHOLDER, (match, key: string) => data[key] || match);
+}
+
+/** Raw placeholders left in a message, e.g. ["{{amount}}"]. */
+export function unfilledPlaceholders(text: string): string[] {
+  return Array.from(new Set(text.match(PLACEHOLDER) || []));
+}
+
+/** The English and Tamil templates from organization_settings, or the built-in ones. */
+export function thankYouTemplatesFrom(
+  row: { thank_you_template_en?: string | null; thank_you_template_ta?: string | null } | null | undefined,
+): Record<ThankYouLanguage, string> {
+  return {
+    en: row?.thank_you_template_en?.trim() ? row.thank_you_template_en : THANK_YOU_TEMPLATE_EN,
+    ta: row?.thank_you_template_ta?.trim() ? row.thank_you_template_ta : THANK_YOU_TEMPLATE_TA,
+  };
+}
+
+/** Indian-style rupees with no decimals: ₹5,000, ₹1,00,000. Empty for a missing or zero amount. */
+export function formatThanksAmount(amount: number | string | null | undefined): string {
+  const n = Number(amount);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** "DD Mon YYYY", e.g. 30 Oct 2026. */
+/** "D Mon YYYY", e.g. 13 Nov 2026. */
 export function formatDonationDate(date: string | null | undefined): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(date || '');
-  return m ? `${m[3]} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : '';
+  return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : '';
 }
 
-/** Placeholder values from the donation record, with safe fallbacks for empty fields. */
+/** The sponsor's preferred language if their record has one, else Tamil. */
+export function defaultThanksLanguage(sponsor: object | null | undefined): ThankYouLanguage {
+  const pref = String((sponsor as { preferred_language?: string | null } | null)?.preferred_language || '').toLowerCase();
+  return pref === 'en' || pref === 'english' ? 'en' : 'ta';
+}
+
+/**
+ * Placeholder values from this one donation record. {{amount}} is left out
+ * when the amount is missing or 0, so the message can't go out as "₹0".
+ */
 export function thankYouData(
   sponsor: Pick<Sponsor, 'full_name' | 'preferred_name'>,
-  donation: Pick<Donation, 'donation_date' | 'type'>,
+  donation: Pick<Donation, 'donation_date' | 'type' | 'amount'>,
   organization: OrganizationNames,
+  language: ThankYouLanguage,
 ): Record<string, string> {
+  const name = sponsor.preferred_name?.trim() || sponsor.full_name?.trim() || '';
   return {
-    donor_name: sponsor.preferred_name?.trim() || sponsor.full_name?.trim() || 'Donor',
-    donation_type: donation.type ? normalizeDonationType(donation.type) : 'your donation',
-    donation_date: formatDonationDate(donation.donation_date) || 'the recent date',
+    sponsor_name: name,
+    donor_name: name,
+    amount: formatThanksAmount(donation.amount),
+    donation_date: formatDonationDate(donation.donation_date),
+    donation_type: donation.type ? normalizeDonationType(donation.type) : '',
     donation_purpose_ta: DEFAULT_DONATION_PURPOSE_TA,
-    organization_name: organization.org_name_en,
+    organization_name: language === 'en' ? organization.org_name_en : organization.org_name_ta,
+    organization_name_en: organization.org_name_en,
     organization_name_ta: organization.org_name_ta,
   };
+}
+
+/** Why a thank-you can't be sent yet, or null when it can. */
+export function thanksBlockReason(text: string, donation: Pick<Donation, 'amount'>): string | null {
+  if (!formatThanksAmount(donation.amount)) return 'This donation has no amount. Please update the donation amount first, then send thanks.';
+  const left = unfilledPlaceholders(text);
+  if (left.length) return `The message still has ${left.join(', ')}. Replace it before sending.`;
+  return null;
 }
 
 /** Short summary line for the dialog, e.g. "₹1,000 · 30 Oct 2026 · Money". */

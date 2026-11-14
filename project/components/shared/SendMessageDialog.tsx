@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Copy, Mail, MessageCircle, MessageSquare } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Copy, Mail, MessageCircle, MessageSquare } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -13,7 +13,7 @@ import { logMessage, markAdminNotified, sendViaApi } from '@/lib/message-service
 import { buildAdminNotification, messagingSettingsFrom, type MessagingSettings } from '@/lib/messaging';
 import { whatsappNumber } from '@/lib/phone';
 import { loadWishContext } from '@/lib/star-wish';
-import { buildEmailUrl, buildSmsUrl } from '@/lib/thank-you';
+import { buildEmailUrl, buildSmsUrl, unfilledPlaceholders } from '@/lib/thank-you';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import type { MessageLog, MessageType } from '@/lib/types';
 
@@ -44,12 +44,14 @@ export interface SendMessageDialogProps {
   onLogged?: (channel: MessageLog['channel'], text: string) => void;
   /** Extra controls above the message, e.g. a template picker. */
   children?: React.ReactNode;
+  /** Why the message can't be sent yet (shown as a warning; sending is disabled). Gets the current text. */
+  blockReason?: (text: string) => string | null;
 }
 
 /** The one Send Message modal: editable message, WhatsApp, and the optional details to the admin. */
 export function SendMessageDialog({
   open, onOpenChange, title = 'Send Message', sponsorId, sponsorName, phone, extraChannels, messageType, typeLabel,
-  initialText, relatedEventId, relatedDonationId, occurrenceDate, contactName, sendLabel = 'Send on WhatsApp', occasionId, occasionType, occasionTitle, onLogged, children,
+  initialText, relatedEventId, relatedDonationId, occurrenceDate, contactName, sendLabel = 'Send on WhatsApp', occasionId, occasionType, occasionTitle, onLogged, children, blockReason,
 }: SendMessageDialogProps) {
   const { appUser } = useAuth();
   const [settings, setSettings] = useState<MessagingSettings>(messagingSettingsFrom(null));
@@ -75,6 +77,11 @@ export function SendMessageDialog({
   const number = whatsappNumber(phone);
   const occurrence = occurrenceDate || getTodayIST();
   const automatic = settings.sendMode === 'automatic';
+  // A raw {{placeholder}} must never reach the sponsor.
+  const leftover = unfilledPlaceholders(text);
+  const blocked = initialText == null ? null
+    : blockReason?.(text) || (leftover.length ? `The message still has ${leftover.join(', ')}. Replace it before sending.` : null);
+  const cannotSend = initialText == null || !!blocked;
 
   const base = {
     sponsorId, sponsorName, sponsorPhone: phone, messageType, typeLabel,
@@ -150,9 +157,13 @@ export function SendMessageDialog({
 
   const smsPhone = extraChannels?.smsPhone;
   const email = extraChannels?.email?.trim();
-  const whatsappLink = (
+  const whatsappLink = cannotSend ? (
+    <Button className="bg-green-600 hover:bg-green-700 text-white" disabled>
+      <MessageCircle className="h-4 w-4 mr-2" />{sendLabel}
+    </Button>
+  ) : (
     <a href={buildWhatsAppUrl(number, text)} target="_blank" rel="noreferrer" onClick={onLinkClick}>
-      <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={initialText == null}>
+      <Button className="bg-green-600 hover:bg-green-700 text-white">
         <MessageCircle className="h-4 w-4 mr-2" />{sendLabel}
       </Button>
     </a>
@@ -196,25 +207,31 @@ export function SendMessageDialog({
             </Label>
           </div>
 
+          {blocked && (
+            <p className="text-sm text-warning bg-warning/10 rounded-lg px-3 py-2 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />{blocked}
+            </p>
+          )}
+
           {apiError && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{apiError}</p>}
 
           <div className="flex flex-wrap gap-2">
             {automatic && !apiError ? (
-              <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={initialText == null || apiBusy} onClick={sendAutomatic}>
+              <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={cannotSend || apiBusy} onClick={sendAutomatic}>
                 <MessageCircle className="h-4 w-4 mr-2" />{apiBusy ? 'Sending...' : sendLabel}
               </Button>
             ) : whatsappLink}
             {extraChannels && (
               <>
                 <span title={smsPhone ? undefined : 'No phone number saved for this sponsor'}>
-                  {smsPhone ? (
+                  {smsPhone && !cannotSend ? (
                     <a href={buildSmsUrl(smsPhone, text)} onClick={() => logged('sms', 'sent')}>
                       <Button variant="outline"><MessageSquare className="h-4 w-4 mr-1.5" />SMS</Button>
                     </a>
                   ) : <Button variant="outline" disabled><MessageSquare className="h-4 w-4 mr-1.5" />SMS</Button>}
                 </span>
                 <span title={email ? undefined : 'No email address saved for this sponsor'}>
-                  {email ? (
+                  {email && !cannotSend ? (
                     <a href={buildEmailUrl(email, text)} onClick={() => logged('email', 'sent')}>
                       <Button variant="outline"><Mail className="h-4 w-4 mr-1.5" />Email</Button>
                     </a>
@@ -222,7 +239,7 @@ export function SendMessageDialog({
                 </span>
               </>
             )}
-            <Button variant="outline" onClick={copy} disabled={initialText == null}>
+            <Button variant="outline" onClick={copy} disabled={cannotSend}>
               <Copy className="h-4 w-4 mr-1.5" />{copied ? 'Copied' : 'Copy'}
             </Button>
             <Button variant="ghost" onClick={() => onOpenChange(false)}>{sentLog ? 'Done' : 'Skip'}</Button>

@@ -16,7 +16,6 @@ import { useAuth } from '@/lib/auth-context';
 import { REMINDER_INTERVAL_OPTIONS } from '@/lib/constants';
 import { organizationNamesFrom } from '@/lib/organization';
 import { DEFAULT_STAR_REMINDER_DAYS } from '@/lib/monthly-sponsors';
-import { THANK_YOU_TEMPLATE, thankYouTemplateFrom } from '@/lib/thank-you';
 import { formatSentAt, messagingSettingsFrom, type MessagingSettings } from '@/lib/messaging';
 import { normalizeIndianNumber } from '@/lib/phone';
 import { clearWishContext } from '@/lib/star-wish';
@@ -34,7 +33,6 @@ export default function SettingsPage() {
   const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', city: '', state: '', timezone: 'Asia/Kolkata', currency: 'INR' });
   const [intervals, setIntervals] = useState<number[]>([7, 3, 1, 0]);
   const [starReminderDays, setStarReminderDays] = useState(String(DEFAULT_STAR_REMINDER_DAYS));
-  const [thankYou, setThankYou] = useState(THANK_YOU_TEMPLATE);
   const [messaging, setMessaging] = useState<MessagingSettings>(messagingSettingsFrom(null));
   const [lastSummary, setLastSummary] = useState<string | null>(null);
   const [apiReady, setApiReady] = useState(false);
@@ -59,7 +57,6 @@ export default function SettingsPage() {
         setIntervals(data.reminder_intervals || [7, 3, 1, 0]);
         setNames(organizationNamesFrom(data));
         setStarReminderDays(String(data.star_reminder_days ?? DEFAULT_STAR_REMINDER_DAYS));
-        setThankYou(thankYouTemplateFrom(data));
         setMessaging(messagingSettingsFrom(data));
       }
     })();
@@ -88,8 +85,6 @@ export default function SettingsPage() {
     const starDays = Math.min(15, Math.max(0, Math.round(Number(starReminderDays) || 0)));
     let payload: Record<string, unknown> = {
       ...form, ...orgNames, name: orgNames.org_name_en || form.name, reminder_intervals: intervals, star_reminder_days: starDays,
-      // Stored only when changed from the built-in text, so default wording updates still apply.
-      thank_you_template: thankYou.trim() && thankYou.trim() !== THANK_YOU_TEMPLATE ? thankYou.trim() : null,
       admin_whatsapp_number: adminNumber,
       admin_name: messaging.adminName.trim() || 'Admin',
       notify_admin_default: messaging.notifyAdminDefault,
@@ -104,7 +99,6 @@ export default function SettingsPage() {
     const optional: { columns: string[]; migration: string; what: string }[] = [
       { columns: ['org_name_en', 'org_name_ta'], migration: '00009', what: 'the organization names' },
       { columns: ['star_reminder_days'], migration: '00011', what: 'the star day reminder days' },
-      { columns: ['thank_you_template'], migration: '00014', what: 'the thank-you template' },
       { columns: ['admin_whatsapp_number', 'admin_name', 'notify_admin_default', 'daily_summary_enabled', 'daily_summary_time', 'whatsapp_send_mode'], migration: '00016', what: 'the admin settings' },
     ];
     const skipped: string[] = [];
@@ -130,7 +124,7 @@ export default function SettingsPage() {
 
   const settingsLinks = [
     { href: '/settings/whatsapp', icon: MessageCircle, label: 'WhatsApp Settings', desc: 'Configure WhatsApp Business API' },
-    { href: '/settings/templates', icon: FileText, label: 'Message Templates', desc: 'Manage birthday, anniversary and sponsorship templates' },
+    { href: '/settings/templates', icon: FileText, label: 'Message Templates', desc: 'Thank-you note, birthday, anniversary and sponsorship templates' },
     { href: '/settings/occasion-types', icon: FileText, label: 'Occasion Types', desc: 'Birthday, anniversary, remembrance and other occasion choices' },
     { href: '/settings/users', icon: Users, label: 'User Management', desc: 'Add and manage team members' },
   ];
@@ -267,19 +261,12 @@ export default function SettingsPage() {
           <p className="text-xs text-muted-foreground">Last summary sent: {lastSummary ? formatSentAt(lastSummary) : 'never'}</p>
         </Card>
 
-        <Card className="p-5 space-y-4">
+        <Card className="p-5 space-y-2">
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Thank You Message Template</h3>
           <p className="text-sm text-muted-foreground">
-            Sent after a donation. Placeholders: {'{{donor_name}}'}, {'{{donation_type}}'}, {'{{donation_date}}'}, {'{{donation_purpose_ta}}'}, {'{{organization_name}}'}, {'{{organization_name_ta}}'}.
+            The English and Tamil thank-you notes (with the donation amount) are edited in{' '}
+            <Link href="/settings/templates#thank-you-note" className="text-primary hover:underline">Message Templates → Thank-You Note</Link>.
           </p>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="thank-you-template">Message</Label>
-              <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={!isAdmin} onClick={() => setThankYou(THANK_YOU_TEMPLATE)}>Reset to default</Button>
-            </div>
-            <Textarea id="thank-you-template" value={thankYou} onChange={(e) => setThankYou(e.target.value)} rows={16} disabled={!isAdmin} />
-          </div>
-          {!isAdmin && <p className="text-xs text-muted-foreground">Only an admin can change the thank-you template.</p>}
         </Card>
 
         {error && <p className="text-sm text-destructive">{error}</p>}

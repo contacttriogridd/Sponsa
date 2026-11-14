@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Plus, Edit, Save, X, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { ThankYouNoteEditor } from '@/components/settings/ThankYouNoteEditor';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -89,6 +90,8 @@ ${ORGANIZATION_SIGN_OFF}`, is_approved: false });
           </div>
           <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />New Template</Button>
         </div>
+
+        <ThankYouNoteEditor />
 
         <div className="p-3 rounded-lg bg-muted text-sm">
           <span className="font-medium">Available variables: </span>

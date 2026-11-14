@@ -23,6 +23,9 @@ export interface OrganizationSettings {
   star_reminder_days?: number | null;
   /** Donation thank-you template; added by migration 00014 (null = built-in text). */
   thank_you_template?: string | null;
+  /** English / Tamil thank-you notes (migration 00021). */
+  thank_you_template_en?: string | null;
+  thank_you_template_ta?: string | null;
   /** Admin and messaging settings; added by migration 00016. */
   admin_whatsapp_number?: string | null;
   admin_name?: string | null;
