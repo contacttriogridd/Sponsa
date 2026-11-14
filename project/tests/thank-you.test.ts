@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  THANK_YOU_TEMPLATE_EN, THANK_YOU_TEMPLATE_TA, defaultThanksLanguage, fillKnown,
+  BOTH_DIVIDER, THANK_YOU_TEMPLATE_EN, THANK_YOU_TEMPLATE_TA, buildThankYouMessage, thanksLanguageChoice, fillKnown,
   formatDonationDate, formatThanksAmount, thankYouData, thankYouTemplatesFrom, thanksBlockReason, unfilledPlaceholders,
 } from '@/lib/thank-you';
 
@@ -62,9 +62,36 @@ test('saved templates win; empty ones fall back to the defaults', () => {
   assert.deepEqual(thankYouTemplatesFrom(null), { en: THANK_YOU_TEMPLATE_EN, ta: THANK_YOU_TEMPLATE_TA });
 });
 
-test('language defaults to Tamil unless the sponsor prefers English', () => {
-  assert.equal(defaultThanksLanguage({}), 'ta');
-  assert.equal(defaultThanksLanguage({ preferred_language: 'en' }), 'en');
+test('language: own last choice, else the Settings default, else Tamil', () => {
+  assert.equal(thanksLanguageChoice(null, null), 'ta');
+  assert.equal(thanksLanguageChoice(undefined, 'both'), 'both');
+  assert.equal(thanksLanguageChoice('en', 'both'), 'en');
+  assert.equal(thanksLanguageChoice('fr', 'xx'), 'ta');
+});
+
+const templates = { en: THANK_YOU_TEMPLATE_EN, ta: THANK_YOU_TEMPLATE_TA };
+const nataraj = { full_name: 'Nataraj', preferred_name: null };
+const food = { amount: 1100, donation_date: '2026-11-09', type: 'Food' };
+
+test('English and Tamil alone are unchanged', () => {
+  assert.equal(buildThankYouMessage(templates, nataraj, food, names, 'en'), fillKnown(THANK_YOU_TEMPLATE_EN, thankYouData(nataraj, food, names, 'en')));
+  assert.equal(buildThankYouMessage(templates, nataraj, food, names, 'ta'), fillKnown(THANK_YOU_TEMPLATE_TA, thankYouData(nataraj, food, names, 'ta')));
+});
+
+test('Both: Tamil first, the divider, then English, each with its own organization name', () => {
+  const text = buildThankYouMessage(templates, nataraj, food, names, 'both');
+  const [ta, en] = text.split(['', '', BOTH_DIVIDER, '', ''].join('\n'));
+  assert.ok(ta.startsWith('🙏  மக்கள் சேவையே மகேசன் சேவை Nataraj அவர்களுக்கு வணக்கம்'));
+  assert.ok(ta.includes('9 Nov 2026 அன்று நீங்கள் வழங்கிய ₹1,100 நன்கொடைக்கு வள்ளலார் பசியாற்றும் அறக்கட்டளை சார்பாக'));
+  assert.ok(ta.endsWith('நன்றியுடன்,\nவள்ளலார் பசியாற்றும் அறக்கட்டளை'));
+  assert.ok(en.startsWith('🙏 Vanakkam Nataraj,'));
+  assert.ok(en.includes('donation of ₹1,100 received on 9 Nov 2026.'));
+  assert.ok(en.endsWith('With heartfelt gratitude,\nVP TRUST'));
+  assert.deepEqual(unfilledPlaceholders(text), []);
+  assert.equal(thanksBlockReason(text, food), null);
+  const url = buildWhatsAppUrl('919629522777', text);
+  assert.equal(decodeURIComponent(url.split('?text=')[1]), text);
+  assert.ok(url.includes(encodeURIComponent(BOTH_DIVIDER)));
 });
 
 test('WhatsApp link keeps ₹, Tamil, emoji and line breaks', () => {

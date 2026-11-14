@@ -12,6 +12,17 @@ export const THANK_YOU_CHANNEL_LABELS: Record<ThankYouChannel, string> = {
 };
 
 export type ThankYouLanguage = 'en' | 'ta';
+/** What the Send Thanks toggle offers: one language, or Tamil then English in one message. */
+export type ThanksLanguageChoice = ThankYouLanguage | 'both';
+
+export const THANKS_LANGUAGE_OPTIONS: { value: ThanksLanguageChoice; label: string }[] = [
+  { value: 'en', label: 'English' },
+  { value: 'ta', label: 'தமிழ்' },
+  { value: 'both', label: 'Both' },
+];
+
+/** Between the Tamil and English parts of a "Both" message. */
+export const BOTH_DIVIDER = '━━━━━━━━━━━━━━';
 
 /** Built-in English thank-you note; the database copy (organization_settings.thank_you_template_en) wins. */
 export const THANK_YOU_TEMPLATE_EN = `🙏 Vanakkam {{sponsor_name}},
@@ -89,10 +100,13 @@ export function formatDonationDate(date: string | null | undefined): string {
   return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : '';
 }
 
-/** The sponsor's preferred language if their record has one, else Tamil. */
-export function defaultThanksLanguage(sponsor: object | null | undefined): ThankYouLanguage {
-  const pref = String((sponsor as { preferred_language?: string | null } | null)?.preferred_language || '').toLowerCase();
-  return pref === 'en' || pref === 'english' ? 'en' : 'ta';
+function asChoice(value: unknown): ThanksLanguageChoice | null {
+  return value === 'en' || value === 'ta' || value === 'both' ? value : null;
+}
+
+/** The toggle's starting option: this user's last choice, else the Settings default, else Tamil. */
+export function thanksLanguageChoice(userChoice: unknown, orgDefault: unknown): ThanksLanguageChoice {
+  return asChoice(userChoice) || asChoice(orgDefault) || 'ta';
 }
 
 /**
@@ -117,6 +131,19 @@ export function thankYouData(
     organization_name_en: organization.org_name_en,
     organization_name_ta: organization.org_name_ta,
   };
+}
+
+/** The filled message: one language, or for "Both" the Tamil note, a divider, then the English note. */
+export function buildThankYouMessage(
+  templates: Record<ThankYouLanguage, string>,
+  sponsor: Pick<Sponsor, 'full_name' | 'preferred_name'>,
+  donation: Pick<Donation, 'donation_date' | 'type' | 'amount'>,
+  organization: OrganizationNames,
+  choice: ThanksLanguageChoice,
+): string {
+  const one = (language: ThankYouLanguage) => fillKnown(templates[language], thankYouData(sponsor, donation, organization, language));
+  if (choice !== 'both') return one(choice);
+  return [one('ta').trim(), BOTH_DIVIDER, one('en').trim()].join('\n\n');
 }
 
 /** Why a thank-you can't be sent yet, or null when it can. */

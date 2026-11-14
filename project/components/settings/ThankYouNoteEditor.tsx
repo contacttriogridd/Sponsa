@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { organizationNamesFrom } from '@/lib/organization';
 import {
-  THANK_YOU_DEFAULTS, THANK_YOU_PLACEHOLDERS, fillKnown, thankYouData, thankYouTemplatesFrom, type ThankYouLanguage,
+  THANKS_LANGUAGE_OPTIONS, THANK_YOU_DEFAULTS, THANK_YOU_PLACEHOLDERS, fillKnown, thankYouData, thankYouTemplatesFrom, thanksLanguageChoice,
+  type ThankYouLanguage, type ThanksLanguageChoice,
 } from '@/lib/thank-you';
 import type { OrganizationSettings } from '@/lib/types';
 
@@ -28,11 +30,14 @@ export function ThankYouNoteEditor() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const [defaultLanguage, setDefaultLanguage] = useState<ThanksLanguageChoice>('ta');
+  const [languageStatus, setLanguageStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     supabase.from('organization_settings').select('*').limit(1).maybeSingle().then(({ data }) => {
       setOrg(data as OrganizationSettings | null);
       setTemplates(thankYouTemplatesFrom(data));
+      setDefaultLanguage(thanksLanguageChoice(null, data?.thank_you_language));
     });
   }, []);
 
@@ -50,6 +55,21 @@ export function ThankYouNoteEditor() {
       el.focus();
       el.setSelectionRange(start + placeholder.length, start + placeholder.length);
     });
+  }
+
+  /** Saves the default straight away; it also becomes the admin's own remembered choice. */
+  async function saveDefaultLanguage(choice: ThanksLanguageChoice) {
+    if (!org) return;
+    const previous = defaultLanguage;
+    setDefaultLanguage(choice);
+    const { error } = await supabase.from('organization_settings').update({ thank_you_language: choice }).eq('id', org.id);
+    if (error) {
+      setDefaultLanguage(previous);
+      setLanguageStatus({ ok: false, text: error.code === 'PGRST204' ? 'The default language needs database migration 00022 first.' : 'Unable to save. Please try again.' });
+      return;
+    }
+    if (appUser) await supabase.from('app_users').update({ thank_you_language: choice }).eq('id', appUser.id);
+    setLanguageStatus({ ok: true, text: 'Default language saved. Anyone who has already picked a language in Send Thanks keeps their last choice.' });
   }
 
   async function save() {
@@ -71,6 +91,20 @@ export function ThankYouNoteEditor() {
       <div>
         <h2 className="font-semibold">Thank-You Note</h2>
         <p className="text-sm text-muted-foreground mt-1">Sent from Send Thanks / Resend on every donation (Money, Food and Monthly), with that donation&apos;s amount and date.</p>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Default thank-you language</Label>
+        <Select value={defaultLanguage} onValueChange={(v) => saveDefaultLanguage(v as ThanksLanguageChoice)} disabled={!isAdmin || !org}>
+          <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {THANKS_LANGUAGE_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>{o.value === 'both' ? 'Both (தமிழ் + English)' : o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">&quot;Both&quot; sends the Tamil note, a divider, then the English note, built from the two templates below.</p>
+        {languageStatus && <p className={languageStatus.ok ? 'text-xs text-success' : 'text-xs text-destructive'}>{languageStatus.text}</p>}
       </div>
 
       <Tabs value={language} onValueChange={(v) => setLanguage(v as ThankYouLanguage)}>

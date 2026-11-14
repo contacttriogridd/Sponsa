@@ -42,8 +42,8 @@ export interface SendMessageDialogProps {
   occasionTitle?: string | null;
   /** Called after each logged send, with the channel and final text. */
   onLogged?: (channel: MessageLog['channel'], text: string) => void;
-  /** Extra controls above the message, e.g. a template picker. */
-  children?: React.ReactNode;
+  /** Extra controls above the message, e.g. a template picker; as a function, told whether the text was edited. */
+  children?: React.ReactNode | ((state: { edited: boolean }) => React.ReactNode);
   /** Why the message can't be sent yet (shown as a warning; sending is disabled). Gets the current text. */
   blockReason?: (text: string) => string | null;
 }
@@ -189,7 +189,7 @@ export function SendMessageDialog({
             <div className="text-muted-foreground">{typeLabel}</div>
           </div>
 
-          {children}
+          {typeof children === 'function' ? children({ edited: initialText != null && text !== initialText }) : children}
 
           <div className="space-y-1.5">
             <Label htmlFor="send-message-text">Message</Label>

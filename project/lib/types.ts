@@ -9,6 +9,8 @@ export interface AppUser {
   role: UserRole;
   active: boolean;
   phone: string | null;
+  /** Last Send Thanks language this user picked (migration 00022). */
+  thank_you_language?: 'en' | 'ta' | 'both' | null;
   created_at: string;
   updated_at: string;
 }
@@ -26,6 +28,8 @@ export interface OrganizationSettings {
   /** English / Tamil thank-you notes (migration 00021). */
   thank_you_template_en?: string | null;
   thank_you_template_ta?: string | null;
+  /** Default Send Thanks language (migration 00022). */
+  thank_you_language?: 'en' | 'ta' | 'both' | null;
   /** Admin and messaging settings; added by migration 00016. */
   admin_whatsapp_number?: string | null;
   admin_name?: string | null;
