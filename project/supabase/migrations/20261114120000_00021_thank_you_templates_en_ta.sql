@@ -23,11 +23,11 @@ With heartfelt gratitude,
 {{organization_name}}$tpl$
 WHERE thank_you_template_en IS NULL OR btrim(thank_you_template_en) = '';
 
-UPDATE organization_settings SET thank_you_template_ta = $tpl$🙏  மக்கள் சேவையே மகேசன் சேவை {{sponsor_name}} அவர்களுக்கு வணக்கம் 
+UPDATE organization_settings SET thank_you_template_ta = $tpl$🙏  மக்கள் சேவையே மகேசன் சேவை மதிப்பிற்குரிய {{sponsor_name}} அவர்களுக்கு வணக்கம் 
 
-{{donation_date}} அன்று நீங்கள் வழங்கிய {{amount}} நன்கொடைக்கு {{organization_name}} சார்பாக எங்கள் மனமார்ந்த வாழ்த்துக்களையும் நன்றிகளையும் தெரிவித்துக் கொள்கிறோம்.
+{{donation_date}} அன்று நீங்கள் கருணையுடன் வழங்கிய {{amount}} நன்கொடைக்கு {{organization_name}} சார்பாக எங்களின் மனமார்ந்த வாழ்த்துக்களையும் நன்றிகளையும் தெரிவித்துக் கொள்கிறோம்.
 
-வள்ளலார் காட்டிய வழியில் பசித்தவர்களுக்கு உணவளிக்கும் எங்கள் சேவையைத் தொடர உங்கள் மேலான உதவி பெரிதும் ஊக்கமளிக்கிறது. 
+வள்ளலார் காட்டிய வழியில் பசித்தவர்களுக்கு உணவளிக்கும் எங்கள் சேவையைத் தொடர உங்களின் மேலான உதவி பெரிதும் ஊக்கமளிக்கிறது. 
 
 நன்றியுடன்,
 {{organization_name}}$tpl$

@@ -39,7 +39,7 @@ test('Tamil note uses the Tamil organization name', () => {
   const food = { amount: 1100, donation_date: '2026-11-13', type: 'Food' };
   const text = fillKnown(THANK_YOU_TEMPLATE_TA, thankYouData({ full_name: 'Ganeshan', preferred_name: null }, food, names, 'ta'));
   assert.ok(text.includes('Ganeshan அவர்களுக்கு வணக்கம்'));
-  assert.ok(text.includes('13 Nov 2026 அன்று நீங்கள் வழங்கிய ₹1,100 நன்கொடைக்கு வள்ளலார் பசியாற்றும் அறக்கட்டளை சார்பாக'));
+  assert.ok(text.includes('13 Nov 2026 அன்று நீங்கள் கருணையுடன் வழங்கிய ₹1,100 நன்கொடைக்கு வள்ளலார் பசியாற்றும் அறக்கட்டளை சார்பாக'));
   assert.ok(text.endsWith('நன்றியுடன்,\nவள்ளலார் பசியாற்றும் அறக்கட்டளை'));
   assert.deepEqual(unfilledPlaceholders(text), []);
 });
@@ -83,8 +83,8 @@ test('Both: Tamil first, the divider, then English, each with its own organizati
   const [ta, en] = text.split(['', '', BOTH_DIVIDER, '', ''].join('\n'));
   assert.equal(ta, buildThankYouMessage(templates, nataraj, food, names, 'ta'));
   assert.equal(en, buildThankYouMessage(templates, nataraj, food, names, 'en'));
-  assert.ok(ta.startsWith('🙏  மக்கள் சேவையே மகேசன் சேவை Nataraj அவர்களுக்கு வணக்கம்'));
-  assert.ok(ta.includes('9 Nov 2026 அன்று நீங்கள் வழங்கிய ₹1,100 நன்கொடைக்கு வள்ளலார் பசியாற்றும் அறக்கட்டளை சார்பாக'));
+  assert.ok(ta.startsWith('🙏  மக்கள் சேவையே மகேசன் சேவை மதிப்பிற்குரிய Nataraj அவர்களுக்கு வணக்கம்'));
+  assert.ok(ta.includes('9 Nov 2026 அன்று நீங்கள் கருணையுடன் வழங்கிய ₹1,100 நன்கொடைக்கு வள்ளலார் பசியாற்றும் அறக்கட்டளை சார்பாக எங்களின் மனமார்ந்த'));
   assert.ok(ta.endsWith('நன்றியுடன்,\nவள்ளலார் பசியாற்றும் அறக்கட்டளை'));
   assert.ok(en.startsWith('🙏 Vanakkam Nataraj,'));
   assert.ok(en.includes('donation of ₹1,100 received on 9 Nov 2026.'));
@@ -110,4 +110,13 @@ test('Both follows an edited Tamil template too', () => {
   const tamil = buildThankYouMessage(edited, nataraj, food, names, 'ta');
   assert.equal(tamil, 'வணக்கம் Nataraj — ₹1,100\nவள்ளலார் பசியாற்றும் அறக்கட்டளை');
   assert.ok(buildThankYouMessage(edited, nataraj, food, names, 'both').startsWith(`${tamil}\n\n${BOTH_DIVIDER}\n\n🙏 Vanakkam Nataraj,`));
+});
+
+test('no old Tamil wording is left in the Tamil note', () => {
+  const ta = buildThankYouMessage(templates, nataraj, food, names, 'ta');
+  assert.ok(!ta.includes('சேவை Nataraj அவர்களுக்கு'));
+  assert.ok(!ta.includes('எங்கள் மனமார்ந்த'));
+  assert.ok(!ta.includes('உங்கள் மேலான'));
+  assert.ok(ta.includes('உங்களின் மேலான உதவி'));
+  assert.ok(buildThankYouMessage(templates, nataraj, food, names, 'both').startsWith(ta));
 });
