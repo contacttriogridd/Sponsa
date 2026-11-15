@@ -11,6 +11,8 @@ export interface AppUser {
   phone: string | null;
   /** Last Send Thanks language this user picked (migration 00022). */
   thank_you_language?: 'en' | 'ta' | 'both' | null;
+  /** Show / Hide events on the Star Calendar (migration 00025). */
+  show_observances?: boolean;
   created_at: string;
   updated_at: string;
 }

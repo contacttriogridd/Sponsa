@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Save, MessageCircle, Users, FileText, Settings2 } from 'lucide-react';
+import { Save, MessageCircle, Users, FileText, Settings2, CalendarDays } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PushNotificationsCard } from '@/components/shared/PushNotificationsCard';
 import { Card } from '@/components/ui/card';
@@ -126,6 +126,7 @@ export default function SettingsPage() {
     { href: '/settings/whatsapp', icon: MessageCircle, label: 'WhatsApp Settings', desc: 'Configure WhatsApp Business API' },
     { href: '/settings/templates', icon: FileText, label: 'Message Templates', desc: 'Thank-you note, birthday, anniversary and sponsorship templates' },
     { href: '/settings/occasion-types', icon: FileText, label: 'Occasion Types', desc: 'Birthday, anniversary, remembrance and other occasion choices' },
+    { href: '/settings/calendar', icon: CalendarDays, label: 'Calendar', desc: 'Observance dates on the Star Calendar; import observances CSV' },
     { href: '/settings/users', icon: Users, label: 'User Management', desc: 'Add and manage team members' },
   ];
 

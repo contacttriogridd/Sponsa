@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ChevronLeft, ChevronRight, Phone, Star } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Info, Phone, Plus, Star } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,11 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SendWishButton } from '@/components/monthly/SendWishButton';
+import { ObservanceChip, ObservanceLegend } from '@/components/monthly/ObservanceChip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/lib/auth-context';
+import { OBSERVANCE_KEYS, OBSERVANCE_META, shortDay, type ObservanceKey, type ObservanceView } from '@/lib/observances';
+import { addManualObservance, loadObservances, loadShowObservances, observancesLastDate, saveShowObservances } from '@/lib/observances-store';
 import { supabase } from '@/lib/supabase/client';
 import { STARS, RAASIS, astroLabel } from '@/lib/natchathiram';
 import { effectiveRaasi, familyStarSubjects, formatIstTime, formatStarDate, parentIdOf, subjectLabel, todayIst, upcomingStarDays, whenLabel, type UpcomingStarDay } from '@/lib/monthly-sponsors';
@@ -37,6 +42,17 @@ export default function StarCalendarPage() {
   const [upcoming, setUpcoming] = useState<UpcomingStarDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
+  const { appUser } = useAuth();
+  const isAdmin = appUser?.role === 'admin';
+  const userId = appUser?.id;
+  const [monthEvents, setMonthEvents] = useState<ObservanceView[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<ObservanceView[]>([]);
+  const [showEvents, setShowEvents] = useState(true);
+  const [lastEventDate, setLastEventDate] = useState<string | null | undefined>(undefined);
+  const [eventsVersion, setEventsVersion] = useState(0);
+  const [addKey, setAddKey] = useState<ObservanceKey>('amavasai');
+  const [addError, setAddError] = useState<string | null>(null);
+  const reloadEvents = () => setEventsVersion((v) => v + 1);
 
   const first = `${year}-${String(month + 1).padStart(2, '0')}-01`;
   const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
@@ -58,6 +74,40 @@ export default function StarCalendarPage() {
     setLoading(true);
     loadStarCalendar(addDays(first, -1), last).then((rows) => { setMonthRows(rows); setLoading(false); });
   }, [first, last]);
+
+  useEffect(() => { loadShowObservances(userId).then(setShowEvents); }, [userId]);
+  useEffect(() => { observancesLastDate().then(setLastEventDate); }, [eventsVersion]);
+  // One query per visible month; admins also get hidden rows, to restore them.
+  useEffect(() => { loadObservances(first, last, isAdmin).then(setMonthEvents); }, [first, last, isAdmin, eventsVersion]);
+  useEffect(() => { loadObservances(today, addDays(today, 29)).then(setUpcomingEvents); }, [today, eventsVersion]);
+
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, ObservanceView[]>();
+    for (const e of monthEvents) {
+      if (!map.has(e.on)) map.set(e.on, []);
+      map.get(e.on)!.push(e);
+    }
+    return map;
+  }, [monthEvents]);
+
+  const toggleEvents = (show: boolean) => { setShowEvents(show); saveShowObservances(userId, show); };
+  const beyondData = lastEventDate !== undefined && (lastEventDate === null || first > lastEventDate);
+
+  const upcomingList = useMemo(() => {
+    const list: ({ kind: 'star'; date: string; item: UpcomingStarDay } | { kind: 'event'; date: string; item: ObservanceView })[] = [
+      ...upcoming.map((u) => ({ kind: 'star' as const, date: u.occurrence.date, item: u })),
+      ...(showEvents ? upcomingEvents.map((e) => ({ kind: 'event' as const, date: e.on, item: e })) : []),
+    ];
+    // By date; on a shared day the events come before the star days.
+    return list.sort((a, b) => a.date.localeCompare(b.date) || (a.kind === b.kind ? 0 : a.kind === 'event' ? -1 : 1));
+  }, [upcoming, upcomingEvents, showEvents]);
+
+  async function addEvent() {
+    if (!selected) return;
+    setAddError(null);
+    const err = await addManualObservance(selected, addKey);
+    if (err) setAddError(err); else reloadEvents();
+  }
 
   const rowByDate = useMemo(() => new Map(monthRows.map((r) => [r.date, r])), [monthRows]);
   const starDaysByDate = useMemo(() => {
@@ -102,7 +152,14 @@ export default function StarCalendarPage() {
             <TabsTrigger value="upcoming">Upcoming — next 30 days</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="calendar" className="mt-4">
+          <TabsContent value="calendar" className="mt-4 space-y-3">
+            <ObservanceLegend show={showEvents} onShowChange={toggleEvents} />
+            {showEvents && beyondData && (
+              <div className="flex items-start gap-2 rounded-md border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+                <Info className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>Observance dates not loaded for this period — import a new CSV in <Link href="/settings/calendar" className="text-primary hover:underline">Settings → Calendar</Link>.</span>
+              </div>
+            )}
             <div className="bg-card rounded-lg border border-border shadow-sm">
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <div>
@@ -126,15 +183,20 @@ export default function StarCalendarPage() {
                 </div>
                 <div className={cn('grid grid-cols-7 gap-1', loading && 'opacity-60')}>
                   {cells.map((date, i) => {
-                    if (!date) return <div key={`blank-${i}`} className="min-h-[72px] sm:min-h-[96px]" />;
+                    if (!date) return <div key={`blank-${i}`} className="min-h-[104px] sm:min-h-[150px]" />;
                     const row = rowByDate.get(date);
                     const people = starDaysByDate.get(date) || [];
+                    const events = showEvents ? eventsByDate.get(date) || [] : [];
                     return (
-                      <button
+                      // A div, not a button: the event chips inside are buttons themselves.
+                      <div
                         key={date}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => setSelected(date)}
+                        onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setSelected(date); } }}
                         className={cn(
-                          'min-h-[72px] sm:min-h-[96px] rounded-md border p-1 sm:p-1.5 text-left transition-colors hover:bg-muted/60 flex flex-col',
+                          'min-h-[104px] sm:min-h-[150px] min-w-0 cursor-pointer rounded-md border p-1 sm:p-1.5 text-left transition-colors hover:bg-muted/60 flex flex-col',
                           date === today ? 'border-primary bg-primary/5' : 'border-border',
                           people.length > 0 && 'bg-warning/5',
                         )}
@@ -149,6 +211,14 @@ export default function StarCalendarPage() {
                             )}
                           </span>
                         )}
+                        {events.length > 0 && (
+                          <span className="mt-1 space-y-0.5 block">
+                            {events.slice(0, 2).map((e) => (
+                              <ObservanceChip key={e.id} item={e} isAdmin={isAdmin} onChanged={reloadEvents} />
+                            ))}
+                            {events.length > 2 && <span className="block text-[10px] text-muted-foreground">+{events.length - 2} more</span>}
+                          </span>
+                        )}
                         {people.length > 0 && (
                           <span className="mt-auto pt-1 space-y-0.5">
                             {people.slice(0, 2).map((p) => (
@@ -157,7 +227,7 @@ export default function StarCalendarPage() {
                             {people.length > 2 && <span className="block text-[10px] text-muted-foreground">+{people.length - 2} more</span>}
                           </span>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -170,10 +240,15 @@ export default function StarCalendarPage() {
 
           <TabsContent value="upcoming" className="mt-4">
             <div className="grid gap-3">
-              {upcoming.map((u) => (
-                <UpcomingCard key={`${u.sponsor.id}-${u.occurrence.date}`} item={u} />
-              ))}
-              {upcoming.length === 0 && (
+              {upcomingList.map((entry) => entry.kind === 'star'
+                ? <UpcomingCard key={`${entry.item.sponsor.id}-${entry.date}`} item={entry.item} />
+                : (
+                  <Card key={entry.item.id} className="px-4 py-3 flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium w-24 shrink-0">{shortDay(entry.date)}</span>
+                    <ObservanceChip item={entry.item} isAdmin={isAdmin} onChanged={reloadEvents} variant="row" />
+                  </Card>
+                ))}
+              {upcomingList.length === 0 && (
                 <Card className="py-14 text-center">
                   <Star className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
                   <h3 className="font-semibold">No star days in the next 30 days</h3>
@@ -203,6 +278,28 @@ export default function StarCalendarPage() {
                     <div className="text-muted-foreground">From {formatIstTime(selectedRow.extra_start!)} to {formatIstTime(selectedRow.extra_end!)}</div>
                   </div>
                 )}
+              </div>
+            )}
+            {selected && showEvents && ((eventsByDate.get(selected) || []).length > 0 || isAdmin) && (
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm">Observances · விரத நாட்கள்</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {(eventsByDate.get(selected) || []).map((e) => (
+                    <ObservanceChip key={e.id} item={e} isAdmin={isAdmin} onChanged={reloadEvents} variant="row" />
+                  ))}
+                </div>
+                {isAdmin && (
+                  <div className="flex items-center gap-2">
+                    <Select value={addKey} onValueChange={(v) => setAddKey(v as ObservanceKey)}>
+                      <SelectTrigger className="h-8 w-56 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {OBSERVANCE_KEYS.map((k) => <SelectItem key={k} value={k}>{OBSERVANCE_META[k].icon} {OBSERVANCE_META[k].ta} · {OBSERVANCE_META[k].short}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" variant="outline" onClick={addEvent}><Plus className="h-3.5 w-3.5 mr-1" />Add event</Button>
+                  </div>
+                )}
+                {addError && <p className="text-xs text-destructive">{addError}</p>}
               </div>
             )}
             <div className="space-y-3">
