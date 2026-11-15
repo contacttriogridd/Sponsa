@@ -81,6 +81,8 @@ test('English and Tamil alone are unchanged', () => {
 test('Both: Tamil first, the divider, then English, each with its own organization name', () => {
   const text = buildThankYouMessage(templates, nataraj, food, names, 'both');
   const [ta, en] = text.split(['', '', BOTH_DIVIDER, '', ''].join('\n'));
+  assert.equal(ta, buildThankYouMessage(templates, nataraj, food, names, 'ta'));
+  assert.equal(en, buildThankYouMessage(templates, nataraj, food, names, 'en'));
   assert.ok(ta.startsWith('🙏  மக்கள் சேவையே மகேசன் சேவை Nataraj அவர்களுக்கு வணக்கம்'));
   assert.ok(ta.includes('9 Nov 2026 அன்று நீங்கள் வழங்கிய ₹1,100 நன்கொடைக்கு வள்ளலார் பசியாற்றும் அறக்கட்டளை சார்பாக'));
   assert.ok(ta.endsWith('நன்றியுடன்,\nவள்ளலார் பசியாற்றும் அறக்கட்டளை'));
@@ -101,4 +103,11 @@ test('WhatsApp link keeps ₹, Tamil, emoji and line breaks', () => {
   assert.equal(decodeURIComponent(url.split('?text=')[1]), text);
   assert.ok(url.includes('%E2%82%B9')); // ₹
   assert.ok(url.includes('%0A')); // line break
+});
+
+test('Both follows an edited Tamil template too', () => {
+  const edited = { ...templates, ta: 'வணக்கம் {{sponsor_name}} — {{amount}}\n{{organization_name}}' };
+  const tamil = buildThankYouMessage(edited, nataraj, food, names, 'ta');
+  assert.equal(tamil, 'வணக்கம் Nataraj — ₹1,100\nவள்ளலார் பசியாற்றும் அறக்கட்டளை');
+  assert.ok(buildThankYouMessage(edited, nataraj, food, names, 'both').startsWith(`${tamil}\n\n${BOTH_DIVIDER}\n\n🙏 Vanakkam Nataraj,`));
 });

@@ -143,7 +143,8 @@ export function buildThankYouMessage(
 ): string {
   const one = (language: ThankYouLanguage) => fillKnown(templates[language], thankYouData(sponsor, donation, organization, language));
   if (choice !== 'both') return one(choice);
-  return [one('ta').trim(), BOTH_DIVIDER, one('en').trim()].join('\n\n');
+  // The Tamil part is exactly what the தமிழ் option shows, from the same saved template.
+  return [one('ta'), BOTH_DIVIDER, one('en')].join('\n\n');
 }
 
 /** Why a thank-you can't be sent yet, or null when it can. */
