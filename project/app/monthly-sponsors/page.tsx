@@ -13,6 +13,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { MonthlySponsorForm } from '@/components/monthly/MonthlySponsorForm';
 import { PaymentDialog } from '@/components/monthly/PaymentDialog';
 import { SendWishButton } from '@/components/monthly/SendWishButton';
+import { EventWishesCard, type EventSponsorRow } from '@/components/monthly/EventWishesCard';
+import { OBSERVANCE_CHIP } from '@/components/monthly/ObservanceChip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { OBSERVANCE_KEYS, OBSERVANCE_META, shortDay, type ObservanceKey, type ObservanceView } from '@/lib/observances';
+import { loadObservances } from '@/lib/observances-store';
+import { nextSponsorEvent, sponsorEventsOf } from '@/lib/event-wishes';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDateShort } from '@/lib/constants';
 import { RAASIS, STARS, astroLabel, isValidCombination } from '@/lib/natchathiram';
@@ -25,7 +32,7 @@ import { openMonthlySponsorDrawer, useDrawerDataChanged } from '@/lib/drawer-sto
 import type { MonthlyFamilyMember, MonthlyPayment, MonthlySponsor } from '@/lib/types';
 import { relationshipLabel } from '@/lib/festival';
 
-type Row = MonthlySponsor & { sponsors?: { full_name: string } | null };
+type Row = EventSponsorRow;
 
 export default function MonthlySponsorsPage() {
   const today = todayIst();
@@ -42,9 +49,11 @@ export default function MonthlySponsorsPage() {
   const [paying, setPaying] = useState<Row | null>(null);
   const [family, setFamily] = useState<Map<string, MonthlyFamilyMember[]>>(new Map());
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [eventFilter, setEventFilter] = useState<'all' | ObservanceKey>('all');
+  const [events, setEvents] = useState<ObservanceView[]>([]);
 
   const loadSponsors = useCallback(async () => {
-    const { data, error } = await supabase.from('monthly_sponsors').select('*, sponsors(full_name)').order('name');
+    const { data, error } = await supabase.from('monthly_sponsors').select('*, sponsors(full_name, whatsapp, phone)').order('name');
     if (error) { setNotReady(true); setLoading(false); return; }
     const rows = (data || []) as Row[];
     setSponsors(rows);
@@ -66,6 +75,11 @@ export default function MonthlySponsorsPage() {
   }, [month]);
 
   useEffect(() => { loadSponsors(); }, [loadSponsors]);
+  // Calendar events (same source as the Star Calendar) for event wishes and each sponsor's next event.
+  useEffect(() => { loadObservances(today, addDays(today, 60)).then(setEvents); }, [today]);
+  const starOn = useCallback((date: string) => new Set(Array.from(nextStarDays.values()).filter((u) => u.occurrence.date === date).map((u) => u.sponsor.id)), [nextStarDays]);
+  const starToday = useMemo(() => starOn(today), [starOn, today]);
+  const starTomorrow = useMemo(() => starOn(addDays(today, 1)), [starOn, today]);
   useEffect(() => { loadPayments(); }, [loadPayments]);
   const reloadAll = useCallback(() => { loadSponsors(); loadPayments(); }, [loadSponsors, loadPayments]);
   useDrawerDataChanged(reloadAll);
@@ -84,6 +98,7 @@ export default function MonthlySponsorsPage() {
 
   const filtered = sponsors.filter((s) => {
     if (filter !== 'all' && s.status !== filter) return false;
+    if (eventFilter !== 'all' && !sponsorEventsOf(s).some((e) => e.event_key === eventFilter)) return false;
     if (!query) return true;
     const q = query.toLowerCase();
     const star = s.star != null ? `${STARS[s.star].ta} ${STARS[s.star].en}` : '';
@@ -132,6 +147,16 @@ export default function MonthlySponsorsPage() {
               <StatCard label="Pending" value={formatCurrency(summary.pending)} icon={Clock} iconColor="text-destructive" trend={monthLabel} />
             </div>
 
+            <EventWishesCard
+              sponsors={sponsors}
+              events={events}
+              today={today}
+              starToday={starToday}
+              starTomorrow={starTomorrow}
+              paymentBySponsor={paymentBySponsor}
+              onMarkPaid={(s) => setPaying(s)}
+            />
+
             <Card className="p-3">
               <div className="flex flex-col md:flex-row gap-3">
                 <div className="relative flex-1">
@@ -143,6 +168,13 @@ export default function MonthlySponsorsPage() {
                     <Button key={f} variant={filter === f ? 'secondary' : 'ghost'} size="sm" onClick={() => setFilter(f)} className="capitalize">{f}</Button>
                   ))}
                 </div>
+                <Select value={eventFilter} onValueChange={(v) => setEventFilter(v as 'all' | ObservanceKey)}>
+                  <SelectTrigger className="h-9 md:w-52" aria-label="Event filter"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Event: All</SelectItem>
+                    {OBSERVANCE_KEYS.map((k) => <SelectItem key={k} value={k}>{OBSERVANCE_META[k].icon} {OBSERVANCE_META[k].ta} · {OBSERVANCE_META[k].short}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </Card>
 
@@ -154,6 +186,8 @@ export default function MonthlySponsorsPage() {
                   const payment = paymentBySponsor.get(s.id);
                   const next = nextStarDays.get(s.id);
                   const raasi = effectiveRaasi(s);
+                  const sponsorEvents = sponsorEventsOf(s);
+                  const nextEvent = nextSponsorEvent(s, events, today);
                   return (
                     <Card key={s.id} className="p-4">
                       <div className="flex flex-col lg:flex-row lg:items-center gap-3">
@@ -170,12 +204,17 @@ export default function MonthlySponsorsPage() {
                                   <Badge variant="secondary" className="font-normal">👨‍👩‍👧 {family.get(s.id)!.length}</Badge>
                                 </button>
                               )}
+                              {sponsorEvents.map((e) => (
+                                <span key={e.event_key} title={`${OBSERVANCE_META[e.event_key].ta} · ${OBSERVANCE_META[e.event_key].short}`} className={cn('inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]', OBSERVANCE_CHIP[e.event_key])}>
+                                  {OBSERVANCE_META[e.event_key].icon} {OBSERVANCE_META[e.event_key].short}
+                                </span>
+                              ))}
                               {!isValidCombination(s.raasi, s.star) && (
                                 <Badge variant="outline" className="text-warning border-warning/40"><AlertTriangle className="h-3 w-3 mr-1" />Check Raasi/Star</Badge>
                               )}
                             </div>
                             <div className="text-sm text-muted-foreground mt-0.5">
-                              {s.star != null ? astroLabel(STARS[s.star]) : 'Star not set'}
+                              {s.star != null ? astroLabel(STARS[s.star]) : sponsorEvents.length ? 'Monthly events only' : 'Star not set'}
                               {raasi != null && ` · ${astroLabel(RAASIS[raasi])}`}
                             </div>
                             <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-3">
@@ -190,10 +229,19 @@ export default function MonthlySponsorsPage() {
                                 ))}
                               </ul>
                             )}
-                            {next && (
-                              <div className="text-sm mt-1.5">
-                                ⭐ Next star day: <span className="font-medium">{formatStarDate(next.occurrence.date)}</span>{' '}
-                                <span className="text-muted-foreground">({whenLabel(next.daysUntil)})</span>
+                            {(next || nextEvent) && (
+                              <div className="text-sm mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5">
+                                {next && (
+                                  <span>
+                                    ⭐ Next star day: <span className="font-medium">{formatStarDate(next.occurrence.date)}</span>{' '}
+                                    <span className="text-muted-foreground">({whenLabel(next.daysUntil)})</span>
+                                  </span>
+                                )}
+                                {nextEvent && (
+                                  <span>
+                                    {nextEvent.label.icon} Next event: <span className="font-medium">{OBSERVANCE_META[nextEvent.event_key].short} · {shortDay(nextEvent.on).replace(/^\w+ /, '')}</span>
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>

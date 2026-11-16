@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DatePicker } from '@/components/shared/DatePicker';
 import { AstroCombobox } from '@/components/monthly/AstroCombobox';
 import { FamilyMembersSection, familyMemberRow, type FamilyMemberDraft } from '@/components/monthly/FamilyMembersSection';
+import { SponsorEventsPicker, eventDraftsFrom, sponsorEventsFromDrafts, type EventDraft } from '@/components/monthly/SponsorEventsPicker';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { RAASIS, STARS, astroLabel, isValidCombination, padamNote, raasisOfStar, starsInRaasi } from '@/lib/natchathiram';
@@ -51,6 +52,7 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
   const [error, setError] = useState('');
   const [familyDrafts, setFamilyDrafts] = useState<FamilyMemberDraft[]>([]);
   const [confirmInvalid, setConfirmInvalid] = useState(false);
+  const [events, setEvents] = useState<EventDraft[]>(() => eventDraftsFrom(sponsor));
 
   useEffect(() => {
     (async () => {
@@ -78,6 +80,9 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
 
   async function save() {
     if (!form.name.trim()) { setError('Name is required.'); return; }
+    // A star day or at least one monthly event: otherwise the sponsor never gets a wish.
+    if (form.star == null && events.length === 0) { setError('Choose a Natchathiram (star) or at least one Monthly Event.'); return; }
+    if (events.some((e) => e.amount.trim() !== '' && !(Number(e.amount) >= 0))) { setError('Event amounts must be numbers.'); return; }
     if (invalidCombo && !confirmInvalid) { setConfirmInvalid(true); return; }
     setBusy(true); setError('');
     const payload = {
@@ -93,6 +98,7 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
       notes: form.notes.trim() || null,
       sponsor_id: form.sponsor_id === NO_SPONSOR ? null : form.sponsor_id,
       relationship: form.sponsor_id === NO_SPONSOR ? null : form.relationship.trim() || null,
+      sponsor_events: sponsorEventsFromDrafts(events),
     };
     // A new sponsor and their family save together in one transaction (migration 00020).
     if (!sponsor) {
@@ -116,6 +122,11 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
       : supabase.from('monthly_sponsors').insert({ ...p, created_by: appUser?.id || null }).select().single();
     const full = { ...payload, address: form.address.trim() || null, payment_mode: form.payment_mode === NO_MODE ? null : form.payment_mode };
     let { data, error: err } = await run(full);
+    if (err?.code === 'PGRST204' && /'sponsor_events'/.test(err.message)) {
+      setBusy(false);
+      setError('Monthly Events need database migration 00026. Run it in the Supabase SQL Editor, then save again.');
+      return;
+    }
     if (err?.code === 'PGRST204' && /'(address|payment_mode)'/.test(err.message)) {
       // Migration 00012 not applied yet: save without address / payment mode.
       ({ data, error: err } = await run(payload));
@@ -145,7 +156,7 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
           <AstroCombobox id="ms-raasi" items={RAASIS} all={RAASIS} value={form.raasi} onChange={(v) => set('raasi', v)} placeholder="Select Raasi" />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="ms-star">Natchathiram (நட்சத்திரம்)</Label>
+          <Label htmlFor="ms-star">Natchathiram (நட்சத்திரம்){events.length === 0 && <span className="text-muted-foreground font-normal"> — or pick a Monthly Event below</span>}</Label>
           <AstroCombobox
             id="ms-star"
             items={starOptions}
@@ -187,6 +198,9 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
         <div className="space-y-1.5">
           <Label>Start date</Label>
           <DatePicker value={form.start_date} onChange={(v) => set('start_date', v)} fromYear={2000} toYear={new Date().getFullYear() + 1} />
+        </div>
+        <div className="sm:col-span-2">
+          <SponsorEventsPicker value={events} onChange={(v) => { setEvents(v); setError(''); }} monthlyAmount={form.monthly_amount} />
         </div>
         <div className="space-y-1.5">
           <Label>Status</Label>

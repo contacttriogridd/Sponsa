@@ -22,6 +22,10 @@ import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { whatsappNumber } from '@/lib/star-wish';
 import { notifyDrawerDataChanged, openSponsorDrawer, useDrawerDataChanged } from '@/lib/drawer-store';
 import { cn } from '@/lib/utils';
+import { OBSERVANCE_CHIP } from '@/components/monthly/ObservanceChip';
+import { OBSERVANCE_META, type ObservanceView } from '@/lib/observances';
+import { loadObservances } from '@/lib/observances-store';
+import { PAKSHA_OPTIONS, entryAmount, hasPaksha, nextSponsorEvent, sponsorEventsOf } from '@/lib/event-wishes';
 import type { MonthlyPayment, MonthlySponsor, MonthlySponsorStatus, MonthlyWishLog } from '@/lib/types';
 
 type Row = MonthlySponsor & { sponsors?: { full_name: string } | null };
@@ -46,6 +50,8 @@ export function MonthlySponsorDetailDrawer({ monthlyId }: { monthlyId: string })
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [calendarEvents, setCalendarEvents] = useState<ObservanceView[] | null>(null);
+  useEffect(() => { loadObservances(today, addDays(today, 60)).then(setCalendarEvents); }, [today]);
 
   const load = useCallback(async () => {
     const [s, p, w] = await Promise.all([
@@ -169,6 +175,34 @@ export function MonthlySponsorDetailDrawer({ monthlyId }: { monthlyId: string })
                   </div>
                 </div>
               </Section>
+
+              {sponsorEventsOf(sponsor).length > 0 && (
+                <Section title="Monthly Events · மாதாந்திர விசேஷ நாட்கள்">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-1.5">
+                      {sponsorEventsOf(sponsor).map((e) => {
+                        const amount = entryAmount(e, sponsor);
+                        return (
+                          <span key={e.event_key} className={cn('inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs', OBSERVANCE_CHIP[e.event_key])}>
+                            {OBSERVANCE_META[e.event_key].icon} {OBSERVANCE_META[e.event_key].ta} · {OBSERVANCE_META[e.event_key].short}
+                            {hasPaksha(e.event_key) && e.paksha !== 'both' && ` (${PAKSHA_OPTIONS.find((o) => o.value === e.paksha)!.ta})`}
+                            {amount != null && ` · ${formatCurrency(amount)}`}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    {(() => {
+                      const nextEvent = calendarEvents ? nextSponsorEvent(sponsor, calendarEvents, today) : null;
+                      return nextEvent ? (
+                        <p className="text-sm">
+                          {nextEvent.label.icon} Next event: <span className="font-medium">{nextEvent.label.ta} · {nextEvent.label.en}</span> — {longDate(nextEvent.on)}{' '}
+                          <span className="text-muted-foreground">({whenLabel(daysBetween(today, nextEvent.on))})</span>
+                        </p>
+                      ) : calendarEvents ? <p className="text-xs text-muted-foreground">No event in the next 60 days (or observance dates not loaded).</p> : null;
+                    })()}
+                  </div>
+                </Section>
+              )}
 
               <FamilyMembersSection monthlySponsorId={sponsor.id} />
 

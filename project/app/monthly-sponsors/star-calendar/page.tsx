@@ -22,6 +22,9 @@ import { addDays, type StarCalendarDay } from '@/lib/star-days';
 import { loadStarCalendar } from '@/lib/star-calendar-store';
 import { openMonthlySponsorDrawer } from '@/lib/drawer-store';
 import { cn } from '@/lib/utils';
+import { OBSERVANCE_CHIP } from '@/components/monthly/ObservanceChip';
+import { eventWishesOn } from '@/lib/event-wishes';
+import { formatCurrency } from '@/lib/constants';
 import type { MonthlyFamilyMember, MonthlySponsor } from '@/lib/types';
 
 const WEEKDAYS = [
@@ -133,6 +136,12 @@ export default function StarCalendarPage() {
 
   const selectedRow = selected ? rowByDate.get(selected) : undefined;
   const selectedSponsors = selected ? starDaysByDate.get(selected) || [] : [];
+  // Monthly sponsors who give on this day's event(s). Someone whose star day is also today is
+  // listed once, under "Star day for", with the event tags.
+  const selectedEventWishes = selected ? eventWishesOn(sponsors, eventsByDate.get(selected) || [], selected) : [];
+  const eventWishById = new Map(selectedEventWishes.map((w) => [w.sponsor.id, w]));
+  const starIds = new Set(selectedSponsors.map((u) => u.sponsor.id));
+  const eventOnlyWishes = selectedEventWishes.filter((w) => !starIds.has(w.sponsor.id));
 
   return (
     <AppLayout>
@@ -246,6 +255,10 @@ export default function StarCalendarPage() {
                   <Card key={entry.item.id} className="px-4 py-3 flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium w-24 shrink-0">{shortDay(entry.date)}</span>
                     <ObservanceChip item={entry.item} isAdmin={isAdmin} onChanged={reloadEvents} variant="row" />
+                    {(() => {
+                      const n = eventWishesOn(sponsors, [entry.item], entry.date).length;
+                      return <span className="text-xs text-muted-foreground ml-auto">{n} sponsor{n === 1 ? '' : 's'}</span>;
+                    })()}
                   </Card>
                 ))}
               {upcomingList.length === 0 && (
@@ -309,6 +322,13 @@ export default function StarCalendarPage() {
                   <div className="flex-1 min-w-0">
                     <button type="button" onClick={() => { setSelected(null); openMonthlySponsorDrawer(parentIdOf(u.sponsor)); }} className="font-medium truncate hover:text-primary text-left">{subjectLabel(u.sponsor)}</button>
                     <div className="text-xs text-muted-foreground">{astroLabel(STARS[u.sponsor.star!])}</div>
+                    {eventWishById.get(u.sponsor.id) && (
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {eventWishById.get(u.sponsor.id)!.events.map((e) => (
+                          <span key={e.id} className={cn('inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]', OBSERVANCE_CHIP[e.event_key])}>{e.label.icon} {e.label.ta}</span>
+                        ))}
+                      </div>
+                    )}
                     {u.sponsor.phone && (
                       <a href={`tel:${u.sponsor.phone}`} className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{u.sponsor.phone}</a>
                     )}
@@ -318,6 +338,27 @@ export default function StarCalendarPage() {
               ))}
               {selectedSponsors.length === 0 && <p className="text-sm text-muted-foreground">No monthly sponsor has this star day.</p>}
             </div>
+            {eventOnlyWishes.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm">Event sponsors · விசேஷ நாள் நன்கொடையாளர்கள்</h3>
+                {eventOnlyWishes.map((w) => (
+                  <div key={w.sponsor.id} className="flex items-center gap-3 p-3 rounded-xl border border-border">
+                    <div className="flex-1 min-w-0">
+                      <button type="button" onClick={() => { setSelected(null); openMonthlySponsorDrawer(w.sponsor.id); }} className="font-medium truncate hover:text-primary text-left">{w.sponsor.name}</button>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {w.events.map((e) => (
+                          <span key={e.id} className={cn('inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]', OBSERVANCE_CHIP[e.event_key])}>{e.label.icon} {e.label.ta}</span>
+                        ))}
+                      </div>
+                      {w.sponsor.phone && (
+                        <a href={`tel:${w.sponsor.phone}`} className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{w.sponsor.phone}</a>
+                      )}
+                    </div>
+                    {w.amount != null && <span className="text-sm font-medium">{formatCurrency(w.amount)}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>

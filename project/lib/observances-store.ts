@@ -24,6 +24,15 @@ export async function loadObservances(from: string, to: string, includeHidden = 
   return observanceViews((data || []) as Observance[], from, to, includeHidden);
 }
 
+/**
+ * The events on one date, from the same table the Star Calendar shows
+ * (moved and hidden dates applied), with each event's paksha.
+ */
+export async function getEventsForDate(date: string): Promise<{ event_key: ObservanceKey; paksha: ObservanceView['label']['paksha']; view: ObservanceView }[]> {
+  const views = await loadObservances(date, date);
+  return views.map((v) => ({ event_key: v.event_key, paksha: v.label.paksha, view: v }));
+}
+
 /** Last date with observance data, or null when the table is empty. */
 export async function observancesLastDate(): Promise<string | null> {
   const { data, error } = await supabase.from('monthly_observances').select('date').order('date', { ascending: false }).limit(1).maybeSingle();

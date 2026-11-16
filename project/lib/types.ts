@@ -1,3 +1,4 @@
+import type { SponsorEvent } from '@/lib/event-wishes';
 import type { Recurrence } from './recurrence';
 
 export type UserRole = 'admin' | 'collector' | 'staff' | 'viewer';
@@ -316,6 +317,8 @@ export interface MonthlySponsor {
   address?: string | null;
   /** Preferred payment mode; added by migration 00012. */
   payment_mode?: PaymentMode | null;
+  /** Monthly Event sponsorship (migration 00026): the calendar events this sponsor gives on. */
+  sponsor_events?: SponsorEvent[];
   /** Set when this entry is a family member's star day, built from monthly_family_members. */
   family_of?: { parentId: string; parentName: string; relationship: string; memberId: string } | null;
   created_by: string | null;

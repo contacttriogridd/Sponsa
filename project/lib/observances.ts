@@ -35,6 +35,9 @@ export const OBSERVANCE_META: Record<ObservanceKey, { en: string; ta: string; sh
   shivaratri: { en: 'Maadha Shivaratri', ta: 'மாத சிவராத்திரி', short: 'Maadha Shivaratri', icon: '🔱' },
 };
 
+/** Events that come twice a month, once in each paksha. */
+export const PAKSHA_EVENTS: ObservanceKey[] = ['ekadashi', 'pradosham', 'sashti'];
+
 /** CSV event_en → event_key. */
 const KEY_BY_ENGLISH: Record<string, ObservanceKey> = {
   amavasai: 'amavasai',
@@ -105,9 +108,12 @@ export function observanceLabel(o: Pick<Observance, 'date' | 'override_date' | '
     if (day === 1) { ta = 'சோம பிரதோஷம்'; en = 'Soma Pradosham'; }
     if (day === 6) { ta = 'சனி பிரதோஷம்'; en = 'Shani Pradosham'; }
   }
-  const paksha = o.event_key === 'ekadashi' || o.event_key === 'pradosham' ? pakshaOf(o, all) : null;
-  if (paksha === 'valarpirai') { ta = `வளர்பிறை ${ta}`; en = `Valarpirai ${en}`; }
-  if (paksha === 'theipirai') { ta = `தேய்பிறை ${ta}`; en = `Theipirai ${en}`; }
+  // Sashti's phase is worked out too (sponsors can pick waxing or waning Sashti), but its label stays as is.
+  const paksha = PAKSHA_EVENTS.includes(o.event_key) ? pakshaOf(o, all) : null;
+  if (o.event_key !== 'sashti') {
+    if (paksha === 'valarpirai') { ta = `வளர்பிறை ${ta}`; en = `Valarpirai ${en}`; }
+    if (paksha === 'theipirai') { ta = `தேய்பிறை ${ta}`; en = `Theipirai ${en}`; }
+  }
   return { ta, en, icon: meta.icon, paksha };
 }
 
