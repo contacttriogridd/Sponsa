@@ -31,17 +31,25 @@ export const OCCASION_ICONS: Record<string, string> = {
 };
 
 export const SPONSORSHIP_STATUSES = [
+  // Request flow (migration 00028): Requested → Confirmed → Paid / Declined / No response.
+  'requested',
+  'confirmed',
+  'paid',
+  'declined',
+  'no_response',
+  // Earlier statuses, still valid for existing records.
   'draft',
   'contacted',
   'interested',
-  'confirmed',
   'pending',
-  'declined',
   'completed',
   'cancelled',
 ] as const;
 
 export const SPONSORSHIP_STATUS_LABELS: Record<string, string> = {
+  requested: 'Requested',
+  paid: 'Paid',
+  no_response: 'No response',
   draft: 'Draft',
   contacted: 'Contacted',
   interested: 'Interested',
@@ -123,6 +131,7 @@ export const TEMPLATE_TYPES = [
   'Star Day Wish',
   'Star Day Upcoming',
   'Star Day Today',
+  'Monthly Sponsorship Request',
   'Occasion: Own Birthday',
   'Occasion: Family Birthday',
   'Occasion: Anniversary',

@@ -13,6 +13,10 @@ import {
   ANNIVERSARY_WHOSE, FAMILY_RELATIONS, REMEMBRANCE_RELATIONS, type OccasionDraft, type OccasionTypeRow, type SponsorDefaults,
 } from '@/lib/occasion-draft';
 import { cn } from '@/lib/utils';
+import { YearlyDatesField } from '@/components/shared/YearlyDatesField';
+import { AstroCombobox } from '@/components/monthly/AstroCombobox';
+import { STARS } from '@/lib/natchathiram';
+import { THITHIS, TAMIL_MONTHS } from '@/lib/tamil-month-names';
 
 const NONE = 'none';
 
@@ -32,6 +36,8 @@ export function OccasionFields({ value, onChange, types, sponsor }: OccasionFiel
   const remembrance = category === 'remembrance';
   const anniversary = category === 'anniversary';
   const other = category === 'other';
+  const star = value.type_key === 'star_birthday';
+  const thithiMode = remembrance && value.date_mode === 'tamil';
   const set = (patch: Partial<OccasionDraft>) => onChange({ ...value, ...patch });
 
   function setRelationship(relationship: string) {
@@ -97,26 +103,76 @@ export function OccasionFields({ value, onChange, types, sponsor }: OccasionFiel
         {!own && (
           <div className="space-y-1.5">
             <Label>
-              {remembrance ? 'Name of the departed' : anniversary ? 'Couple names' : other ? 'Person name (optional)' : "Person's name"}
+              {star ? "Person's name (if not the sponsor)" : remembrance ? 'Name of the departed' : anniversary ? 'Couple names' : other ? 'Person name (optional)' : "Person's name"}
               {type?.needs_person_name && <span className="text-destructive"> *</span>}
             </Label>
             <Input value={value.person_name} onChange={(e) => set({ person_name: e.target.value })} placeholder={remembrance ? 'e.g. Muthusamy' : anniversary ? 'e.g. Ravi & Meena' : 'e.g. Arun'} />
           </div>
         )}
-        <div className="space-y-1.5">
-          <Label>
-            {remembrance ? 'Date of passing' : anniversary ? 'Wedding date' : category === 'birthday' ? 'Date of birth' : 'Date'}
-            {!own && <span className="text-destructive"> *</span>}
-          </Label>
-          <DatePicker value={value.occasion_date} onChange={(v) => set({ occasion_date: v })} placeholder={own && sponsor.dob ? 'Uses the date of birth above' : undefined} />
-        </div>
+        {remembrance && (
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Remembered on <span className="text-destructive">*</span></Label>
+            <div className="inline-flex rounded-lg border border-border p-0.5" role="group">
+              {([['english', 'English date'], ['tamil', 'Tamil month + thithi']] as const).map(([mode, label]) => (
+                <button key={mode} type="button" aria-pressed={value.date_mode === mode} onClick={() => set({ date_mode: mode })}
+                  className={cn('px-3 py-1 text-sm rounded-md', value.date_mode === mode ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}>{label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        {(star || thithiMode) && (
+          <div className="space-y-1.5">
+            <Label>Tamil month <span className="text-destructive">*</span></Label>
+            <Select value={value.tamil_month != null ? String(value.tamil_month) : undefined} onValueChange={(v) => set({ tamil_month: Number(v) })}>
+              <SelectTrigger><SelectValue placeholder="Select month" /></SelectTrigger>
+              <SelectContent>
+                {TAMIL_MONTHS.map((m, i) => <SelectItem key={m.en} value={String(i)}>{m.ta} · {m.en}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {star && (
+          <div className="space-y-1.5">
+            <Label htmlFor={`star-${value.localId}`}>Natchathiram (star) <span className="text-destructive">*</span></Label>
+            <AstroCombobox id={`star-${value.localId}`} items={STARS} all={STARS} value={value.star} onChange={(v) => set({ star: v })} placeholder="Select star" />
+          </div>
+        )}
+        {thithiMode && (
+          <div className="space-y-1.5">
+            <Label>Thithi <span className="text-destructive">*</span></Label>
+            <Select value={value.thithi != null ? String(value.thithi) : undefined} onValueChange={(v) => set({ thithi: Number(v) })}>
+              <SelectTrigger><SelectValue placeholder="Select thithi" /></SelectTrigger>
+              <SelectContent>
+                {THITHIS.map((t) => <SelectItem key={t.index} value={String(t.index)}>{t.ta} · {t.en}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {(star || thithiMode) && (
+          <YearlyDatesField
+            kind={star ? 'star' : 'thithi'}
+            month={value.tamil_month}
+            value={star ? value.star : value.thithi}
+            dates={value.yearly_dates}
+            onChange={(yearly_dates) => set({ yearly_dates })}
+          />
+        )}
+        {!star && !thithiMode && (
+          <div className="space-y-1.5">
+            <Label>
+              {remembrance ? 'Date of passing' : anniversary ? 'Wedding date' : category === 'birthday' ? 'Date of birth' : 'Date'}
+              {!own && <span className="text-destructive"> *</span>}
+            </Label>
+            <DatePicker value={value.occasion_date} onChange={(v) => set({ occasion_date: v })} placeholder={own && sponsor.dob ? 'Uses the date of birth above' : undefined} />
+          </div>
+        )}
         {remembrance && (
           <div className="space-y-1.5">
-            <Label>Tamil calendar date / thithi (optional)</Label>
+            <Label>Tamil calendar note (optional)</Label>
             <Input lang="ta" value={value.thithi_note} onChange={(e) => set({ thithi_note: e.target.value })} placeholder="Note only" />
           </div>
         )}
-        <RepeatFields value={value.repeat} onChange={(repeat) => set({ repeat })} />
+        {!star && !thithiMode && <RepeatFields value={value.repeat} onChange={(repeat) => set({ repeat })} />}
 
         {!own && (
           <>

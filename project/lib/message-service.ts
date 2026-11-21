@@ -110,8 +110,9 @@ export async function logMessage(input: LogInput): Promise<MessageLog | null> {
     related_donation_id: input.relatedDonationId || null,
     occasion_id: input.occasionId || null,
     occasion_type: input.occasionType || null,
+    // Column from migration 00019; sent whenever known, so a monthly sponsorship request is linked to its sponsor.
+    ...(input.monthlySponsorId ? { monthly_sponsor_id: input.monthlySponsorId } : {}),
     ...(input.festivalKey ? {
-      monthly_sponsor_id: input.monthlySponsorId || null,
       festival_key: input.festivalKey,
       festival_year: input.festivalYear,
       sponsor_category: input.sponsorCategory,

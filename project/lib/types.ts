@@ -61,6 +61,12 @@ export interface Sponsor {
   sponsor_id: string | null;
   /** Mr / Mrs / Ms / Dr; added by migration 00017. */
   title?: 'Mr' | 'Mrs' | 'Ms' | 'Dr' | null;
+  /** Category and common sponsorship fields (migration 00028). */
+  sponsor_category?: string | null;
+  sponsorship_amount?: number | null;
+  payment_mode?: string | null;
+  reminder_days_before?: number | null;
+  preferred_language?: 'ta' | 'en' | null;
   full_name: string;
   preferred_name: string | null;
   dob: string | null;
@@ -111,6 +117,11 @@ export interface SpecialOccasion {
   linked_donation_type?: string | null;
   linked_donation_details?: string | null;
   thithi_note?: string | null;
+  /** Star Birthday / Thithi memorial (migration 00028). */
+  star?: number | null;
+  tamil_month?: number | null;
+  thithi?: number | null;
+  yearly_dates?: Record<string, string> | null;
   id: string;
   sponsor_id: string;
   family_member_id: string | null;
@@ -159,7 +170,16 @@ export interface Notification {
 
 export interface SponsorshipRequest {
   id: string;
+  /** Null for a monthly sponsor's request (migration 00028). */
   sponsor_id: string;
+  monthly_sponsor_id?: string | null;
+  /** Donation category; set on records created when a request is sent. */
+  category?: string | null;
+  request_sent_at?: string | null;
+  channel?: string | null;
+  related_event_id?: string | null;
+  donation_id?: string | null;
+  source_log_id?: string | null;
   occasion_id: string | null;
   occasion_name: string | null;
   special_date: string | null;
@@ -363,7 +383,7 @@ export interface MonthlyWishLog {
   sent_at: string;
 }
 
-export type MessageType = 'birthday_wish' | 'anniversary_wish' | 'event_wish' | 'donation_thanks' | 'admin_notification' | 'admin_daily_summary' | 'festival_wish';
+export type MessageType = 'birthday_wish' | 'anniversary_wish' | 'event_wish' | 'donation_thanks' | 'admin_notification' | 'admin_daily_summary' | 'festival_wish' | 'sponsorship_request' | 'donation_acknowledgment';
 
 export interface MessageLog {
   id: string;

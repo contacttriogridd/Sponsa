@@ -20,6 +20,7 @@ export interface OccasionTypeRow {
 /** Used until the occasion_types table exists. */
 export const DEFAULT_OCCASION_TYPES: OccasionTypeRow[] = [
   { key: 'self_birthday', name_en: "Sponsor's Own Birthday", name_ta: 'சொந்த பிறந்தநாள்', icon: '🎂', category: 'birthday', needs_person_name: false, is_active: true, sort_order: 10 },
+  { key: 'star_birthday', name_en: 'Star Birthday (Natchathiram)', name_ta: 'நட்சத்திர பிறந்தநாள்', icon: '⭐', category: 'birthday', needs_person_name: false, is_active: true, sort_order: 25 },
   { key: 'family_birthday', name_en: "Family Member's Birthday", name_ta: 'குடும்பத்தினர் பிறந்தநாள்', icon: '🎂', category: 'birthday', needs_person_name: true, is_active: true, sort_order: 20 },
   { key: 'wedding_anniversary', name_en: 'Wedding Anniversary', name_ta: 'திருமண நாள்', icon: '💍', category: 'anniversary', needs_person_name: true, is_active: true, sort_order: 30 },
   { key: 'death_anniversary', name_en: 'Death Anniversary (Remembrance)', name_ta: 'நினைவு நாள்', icon: '🪔', category: 'remembrance', needs_person_name: true, is_active: true, sort_order: 40 },
@@ -55,6 +56,14 @@ export interface OccasionDraft {
   notes: string;
   remind_days_before: number[] | null;
   repeat: RepeatValue;
+  /** Star Birthday: Tamil month (0 = Chithirai) and star; Thithi memorial: Tamil month and thithi (0–29). */
+  star: number | null;
+  tamil_month: number | null;
+  thithi: number | null;
+  /** English date for each year, e.g. { "2026": "2026-12-05" } (migration 00028). */
+  yearly_dates: Record<string, string>;
+  /** Memorial: an English date, or a Tamil month + thithi. */
+  date_mode: 'english' | 'tamil';
   active: boolean;
   family_member_id?: string | null;
   is_auto_generated?: boolean;
@@ -81,6 +90,7 @@ export function newDraft(typeKey: string, date = ''): OccasionDraft {
     remind_days_before: [0],
     repeat: { recurrence: 'yearly', weekdays: [], day_of_month: '', end_date: '' },
     active: true,
+    star: null, tamil_month: null, thithi: null, yearly_dates: {}, date_mode: 'english',
   };
 }
 
@@ -117,8 +127,34 @@ export function draftFromOccasion(o: SpecialOccasion, typeKey: string): Occasion
     active: o.active,
     family_member_id: o.family_member_id,
     is_auto_generated: o.is_auto_generated,
+    star: o.star ?? null,
+    tamil_month: o.tamil_month ?? null,
+    thithi: o.thithi ?? null,
+    yearly_dates: o.yearly_dates || {},
+    date_mode: o.thithi != null ? 'tamil' : 'english',
   };
 }
+
+export const isStarBirthday = (d: Pick<OccasionDraft, 'type_key'>) => d.type_key === 'star_birthday';
+
+/** Years shown for a Star Birthday / Thithi memorial: this year and the next four. */
+export function yearsFrom(today: string, count = 5): string[] {
+  const y = Number(today.slice(0, 4));
+  return Array.from({ length: count }, (_, i) => String(y + i));
+}
+
+/** Years in the list with no date yet. */
+export function missingYears(d: Pick<OccasionDraft, 'yearly_dates'>, today: string): string[] {
+  return yearsFrom(today).filter((y) => !d.yearly_dates[y]);
+}
+
+/** The date a yearly-dated occasion is saved under: the next one from today, else the latest. */
+export function nextYearlyDate(dates: Record<string, string>, today: string): string {
+  const list = Object.values(dates).filter(Boolean).sort();
+  return list.find((x) => x >= today) || list[list.length - 1] || '';
+}
+
+const usesYearlyDates = (d: OccasionDraft, category: OccasionCategory) => isStarBirthday(d) || (category === 'remembrance' && d.date_mode === 'tamil');
 
 export interface SponsorDefaults {
   name: string;
@@ -133,7 +169,17 @@ export function validateDraft(d: OccasionDraft, type: OccasionTypeRow | undefine
   const label = type?.name_en || 'Occasion';
   const own = d.type_key === 'self_birthday';
   const category = type?.category || 'other';
-  if (!own && !d.occasion_date) return `${label}: the date is required.`;
+  if (isStarBirthday(d)) {
+    if (d.tamil_month == null) return `${label}: choose the Tamil month.`;
+    if (d.star == null) return `${label}: choose the Natchathiram (star).`;
+    if (!Object.values(d.yearly_dates).some(Boolean)) return `${label}: calculate or enter at least one year's date.`;
+    return null;
+  }
+  if (category === 'remembrance' && d.date_mode === 'tamil') {
+    if (d.tamil_month == null) return `${label}: choose the Tamil month.`;
+    if (d.thithi == null) return `${label}: choose the thithi.`;
+    if (!Object.values(d.yearly_dates).some(Boolean)) return `${label}: calculate or enter at least one year's date.`;
+  } else if (!own && !d.occasion_date) return `${label}: the date is required.`;
   if (own && !d.occasion_date && !sponsor.dob) return `${label}: enter the date of birth.`;
   const needsRelation = d.type_key === 'family_birthday' || category === 'remembrance';
   if (needsRelation && !relationOf(d)) return `${label}: the relationship is required.`;
@@ -152,7 +198,9 @@ export function validateDraft(d: OccasionDraft, type: OccasionTypeRow | undefine
 export function draftToRow(d: OccasionDraft, type: OccasionTypeRow | undefined, sponsorId: string, sponsor: SponsorDefaults) {
   const own = d.type_key === 'self_birthday';
   const category = type?.category || 'other';
-  const date = d.occasion_date || (own ? sponsor.dob || '' : '');
+  const yearly = usesYearlyDates(d, category);
+  const today = new Date(Date.now() + 330 * 60 * 1000).toISOString().slice(0, 10);
+  const date = yearly ? nextYearlyDate(d.yearly_dates, today) : d.occasion_date || (own ? sponsor.dob || '' : '');
   const name = d.contact_name.trim();
   const sameAsSponsor = !name || name.toLowerCase() === sponsor.name.trim().toLowerCase();
   const typeNameEn = type?.key === 'other' ? '' : type?.name_en || '';
@@ -179,5 +227,12 @@ export function draftToRow(d: OccasionDraft, type: OccasionTypeRow | undefined, 
     ...repeatRow(d.repeat, date),
     active: d.active,
     is_auto_generated: false,
+    // Star Birthday / Thithi memorial (migration 00028); plain occasions keep these empty.
+    ...(yearly || d.star != null || d.thithi != null || Object.keys(d.yearly_dates).length ? {
+      star: isStarBirthday(d) ? d.star : null,
+      tamil_month: yearly ? d.tamil_month : null,
+      thithi: yearly && !isStarBirthday(d) ? d.thithi : null,
+      yearly_dates: yearly ? d.yearly_dates : null,
+    } : {}),
   };
 }

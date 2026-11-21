@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Save, MessageCircle, Users, FileText, Settings2, CalendarDays } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PushNotificationsCard } from '@/components/shared/PushNotificationsCard';
+import { DonationContactSettings } from '@/components/settings/DonationContactSettings';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -140,6 +141,7 @@ export default function SettingsPage() {
         </div>
 
         <PushNotificationsCard />
+        <DonationContactSettings />
 
         <Card className="p-5 space-y-4">
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Organization Details</h3>

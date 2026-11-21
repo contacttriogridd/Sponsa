@@ -14,6 +14,7 @@ import { DeleteRecordDialog, type DeletableRecord } from '@/components/shared/De
 import { RecordDonationDialog } from '@/components/shared/RecordDonationDialog';
 import { ThankYouDialog } from '@/components/shared/ThankYouDialog';
 import { ThanksStatusButton } from '@/components/shared/ThanksStatusButton';
+import { AcknowledgmentButton } from '@/components/shared/AcknowledgmentButton';
 import { openMonthlySponsorDrawer, useDrawerDataChanged } from '@/lib/drawer-store';
 import { thanksStatus } from '@/lib/messaging';
 import { useAuth } from '@/lib/auth-context';
@@ -179,6 +180,7 @@ export default function DonationsPage() {
                     </div>
                   </div>
                   <div className="flex items-center justify-end gap-2 shrink-0">
+                    <AcknowledgmentButton donation={d} sponsorName={donorName(d)} onChanged={() => load()} />
                     {(d.sponsors || d.monthly_sponsors) && <ThanksStatusButton donation={d} logs={logs} onSend={() => setThanking(d)} />}
                     <div className="text-right">
                       <div className="font-bold text-success">{formatCurrency(Number(d.amount))}</div>

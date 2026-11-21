@@ -69,6 +69,7 @@ export function occasionTitle(o: OccasionLike, sponsorName: string): string {
   const person = withoutLate(o.person_name);
   const of = isSelfRelation(o.relationship) ? '' : ` (${o.relationship!.trim()} of ${sponsorName})`;
   if (category === 'remembrance') return `Remembrance Day – Late ${person}${of}`;
+  if (key === 'star_birthday') return `${person}'s Star Birthday${of}`;
   if (category === 'birthday') return `${person}'s Birthday${key === 'self_birthday' ? '' : of}`;
   if (category === 'anniversary') return of ? `Wedding Anniversary – ${person}${of}` : `${person ? `${person}'s ` : ''}Wedding Anniversary`;
   const name = o.occasion_name_en || (o.occasion_type === 'Other' ? 'Special Day' : o.occasion_type);

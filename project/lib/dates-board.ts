@@ -26,6 +26,7 @@ export type BoardCategory = (typeof BOARD_CATEGORIES)[number]['key'];
 /** Which board row a dashboard reminder belongs to (null: not one of the five). */
 export function boardCategoryOf(item: Pick<ReminderItem, 'key' | 'kind' | 'calm' | 'occasionRecord'>): BoardCategory | null {
   if (item.key.startsWith('mspay:')) return 'monthly';
+  if (item.occasionRecord?.occasion_type_key === 'star_birthday') return 'star';
   if (item.calm) return 'memorial';
   if (item.kind === 'birthday') return 'birthday';
   if (item.occasionRecord && occasionCategory(item.occasionRecord) === 'anniversary') return 'anniversary';

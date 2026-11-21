@@ -122,10 +122,27 @@ export function recurrenceBadge(event: RecurringEvent): string | null {
 }
 
 /** A special occasion as a recurring event. No recurrence saved means it follows recurring_yearly. */
+/**
+ * A Star Birthday or Thithi memorial has a different English date each year
+ * (special_occasions.yearly_dates, migration 00028). The one to use: the first
+ * from a week ago on (so a just-passed day still shows as Past), else the last.
+ */
+export function pickYearlyDate(dates: Record<string, string> | null | undefined, today: string): string | null {
+  const list = Object.values(dates || {}).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  if (!list.length) return null;
+  return list.find((d) => d >= shiftDate(today, -7)) || list[list.length - 1];
+}
+
+const IST_MS = 330 * 60 * 1000;
+const todayIstDate = () => new Date(Date.now() + IST_MS).toISOString().slice(0, 10);
+
 export function occasionEvent(o: {
   occasion_date: string; recurring_yearly: boolean; active?: boolean | null; recurrence?: Recurrence | null;
   weekdays?: number[] | null; day_of_month?: number | null; start_date?: string | null; end_date?: string | null;
-}): RecurringEvent {
+  yearly_dates?: Record<string, string> | null;
+}, today: string = todayIstDate()): RecurringEvent {
+  const yearly = pickYearlyDate(o.yearly_dates, today);
+  if (yearly) return { date: yearly, recurrence: 'none', start_date: yearly, end_date: null, active: o.active };
   return {
     date: o.occasion_date,
     recurrence: o.recurrence || (o.recurring_yearly ? 'yearly' : 'none'),

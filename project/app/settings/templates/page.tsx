@@ -27,7 +27,7 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [editing, setEditing] = useState<MessageTemplate | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', type: 'Birthday Wish', subject: '', body: '', is_approved: false });
+  const [form, setForm] = useState({ name: '', type: 'Birthday Wish', subject: '', body: '', is_approved: false, language: '' });
   const [busy, setBusy] = useState(false);
   const organizationNames = useOrganizationNames();
 
@@ -40,7 +40,7 @@ export default function TemplatesPage() {
 
   function openEdit(t: MessageTemplate) {
     setEditing(t);
-    setForm({ name: t.name, type: t.type, subject: t.subject || '', body: t.body, is_approved: t.is_approved });
+    setForm({ name: t.name, type: t.type, subject: t.subject || '', body: t.body, is_approved: t.is_approved, language: (t as MessageTemplate & { language?: string | null }).language || '' });
     setShowForm(true);
   }
 
@@ -48,7 +48,7 @@ export default function TemplatesPage() {
     setEditing(null);
     setForm({ name: '', type: 'Birthday Wish', subject: '', body: `
 
-${ORGANIZATION_SIGN_OFF}`, is_approved: false });
+${ORGANIZATION_SIGN_OFF}`, is_approved: false, language: '' });
     setShowForm(true);
   }
 
@@ -56,7 +56,9 @@ ${ORGANIZATION_SIGN_OFF}`, is_approved: false });
     if (!form.name || !form.body) return;
     setBusy(true);
     const vars = (form.body.match(/\{\{(\w+)\}\}/g) || []).map((v) => v.replace(/[{}]/g, ''));
-    const payload = { ...form, variables: vars, subject: form.subject || null };
+    // language (migration 00028) only matters for the Monthly Sponsorship Request (Tamil / English).
+    const { language, ...rest } = form;
+    const payload = { ...rest, variables: vars, subject: form.subject || null, ...(language || form.type === 'Monthly Sponsorship Request' ? { language: language || 'ta' } : {}) };
     if (editing) {
       await supabase.from('message_templates').update(payload).eq('id', editing.id);
     } else {
@@ -74,7 +76,7 @@ ${ORGANIZATION_SIGN_OFF}`, is_approved: false });
     ? body.replace(/\{\{\s*organization_name\s*\}\}/g, organizationNames.org_name_en).replace(/\{\{\s*organization_name_ta\s*\}\}/g, organizationNames.org_name_ta)
     : renderTemplate(body, {}, organizationNames));
 
-  const VARIABLES = ['{{sponsor_name}}', '{{person_name}}', '{{occasion}}', '{{organization_name}}', '{{date}}', '{{star_name}}', '{{raasi_name}}', '{{star_date}}', '{{monthly_amount}}', '{{star_tamil}}', '{{star_english}}', '{{star_day_date}}', '{{star_day_weekday}}', '{{days_left}}', '{{organization_name_tamil}}', '{{contact_phone}}', '{{contact_name}}', '{{contact_title_en}}', '{{contact_title_ta}}', '{{relation_en}}', '{{relation_ta}}', '{{event_date}}', '{{donation_line_en}}', '{{donation_line_ta}}', '{{organization_name_ta}}'];
+  const VARIABLES = ['{{sponsor_name}}', '{{person_name}}', '{{occasion}}', '{{organization_name}}', '{{date}}', '{{star_name}}', '{{raasi_name}}', '{{star_date}}', '{{monthly_amount}}', '{{star_tamil}}', '{{star_english}}', '{{star_day_date}}', '{{star_day_weekday}}', '{{days_left}}', '{{organization_name_tamil}}', '{{contact_phone}}', '{{contact_name}}', '{{contact_title_en}}', '{{contact_title_ta}}', '{{relation_en}}', '{{relation_ta}}', '{{event_date}}', '{{donation_line_en}}', '{{donation_line_ta}}', '{{organization_name_ta}}', '{{month}}', '{{sponsor_date}}', '{{amount}}', '{{upi_id}}', '{{bank_details}}', '{{contact_number}}'];
 
   return (
     <AppLayout>
@@ -119,6 +121,7 @@ ${ORGANIZATION_SIGN_OFF}`, is_approved: false });
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold">{t.name}</span>
                     <Badge variant="outline" className="text-xs">{t.type}</Badge>
+                    {(t as MessageTemplate & { language?: string | null }).language && <Badge variant="secondary" className="text-xs">{(t as MessageTemplate & { language?: string | null }).language === 'ta' ? 'தமிழ்' : 'English'}</Badge>}
                     {t.is_approved && (
                       <span className="flex items-center gap-1 text-xs text-success">
                         <CheckCircle2 className="h-3 w-3" />Approved
@@ -162,6 +165,19 @@ ${ORGANIZATION_SIGN_OFF}`, is_approved: false });
                     </SelectContent>
                   </Select>
                 </div>
+                {form.type === 'Monthly Sponsorship Request' && (
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label>Language</Label>
+                    <Select value={form.language || 'ta'} onValueChange={(v) => set('language', v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ta">தமிழ் Tamil</SelectItem>
+                        <SelectItem value="en">English</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Placeholders: {'{{sponsor_name}} {{organization_name}} {{month}} {{sponsor_date}} {{amount}} {{upi_id}} {{bank_details}} {{contact_number}}'}. Sent from Monthly Sponsors → Payment requests.</p>
+                  </div>
+                )}
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label>Subject (optional)</Label>
                   <Input value={form.subject} onChange={(e) => set('subject', e.target.value)} placeholder="Email subject line" />

@@ -1,7 +1,7 @@
 'use client';
 
 import { OccasionFields } from '@/components/shared/OccasionFields';
-import { TITLES, occasionKeyOf } from '@/lib/occasion-details';
+import { TITLES, occasionCategory, occasionKeyOf } from '@/lib/occasion-details';
 import { draftFromOccasion, draftToRow, newDraft, validateDraft, type OccasionDraft } from '@/lib/occasion-draft';
 import { useOccasionTypes } from '@/lib/use-occasion-types';
 import type { SpecialOccasion } from '@/lib/types';
@@ -21,6 +21,26 @@ import { supabase } from '@/lib/supabase/client';
 import type { Sponsor } from '@/lib/types';
 import { COMMUNICATION_PREFERENCES } from '@/lib/constants';
 import { useAuth } from '@/lib/auth-context';
+import { CATEGORY_META, DONATION_CATEGORIES, PAYMENT_MODES, type DonationCategory } from '@/lib/donations';
+import { cn } from '@/lib/utils';
+
+/** The occasion type a category adds (Monthly and the one-time kinds have their own fields). */
+const CATEGORY_TYPE: Partial<Record<DonationCategory, string>> = {
+  Birthday: 'self_birthday', 'Star Birthday': 'star_birthday', 'Wedding Anniversary': 'wedding_anniversary',
+  'Memorial (Thithi)': 'death_anniversary', General: 'other', Annadhanam: 'other', Other: 'other',
+};
+const ONE_TIME: DonationCategory[] = ['General', 'Annadhanam', 'Other'];
+
+/** Category an existing occasion belongs to. */
+function categoryOfType(typeKey: string, category: string | undefined): DonationCategory {
+  if (typeKey === 'star_birthday') return 'Star Birthday';
+  if (category === 'birthday') return 'Birthday';
+  if (category === 'anniversary') return 'Wedding Anniversary';
+  if (category === 'remembrance') return 'Memorial (Thithi)';
+  return 'Other';
+}
+
+const lastDayOf = (month: string) => { const [y, m] = month.split('-').map(Number); return `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`; };
 
 interface SponsorFormProps {
   sponsor?: Sponsor;
@@ -54,7 +74,16 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
     whatsapp_consent: sponsor?.whatsapp_consent ?? false,
     notes: sponsor?.notes || '',
     status: sponsor?.status || 'active',
+    // Category and common sponsorship fields (migration 00028).
+    sponsor_category: (sponsor?.sponsor_category || '') as DonationCategory | '',
+    sponsorship_amount: sponsor?.sponsorship_amount != null ? String(sponsor.sponsorship_amount) : '',
+    payment_mode: sponsor?.payment_mode || '',
+    reminder_days_before: String(sponsor?.reminder_days_before ?? 3),
+    preferred_language: sponsor?.preferred_language || 'ta',
   });
+  // Monthly Sponsor category: saved as a monthly sponsor linked to this sponsor.
+  const [monthly, setMonthly] = useState({ id: '', day: '', amount: '', start_month: '', end_month: '' });
+  const setM = (k: keyof typeof monthly, v: string) => setMonthly((m) => ({ ...m, [k]: v }));
 
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -72,10 +101,41 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
   useEffect(() => {
     if (!sponsor) return;
     (async () => {
-      const { data } = await supabase.from('special_occasions').select('*').eq('sponsor_id', sponsor.id).eq('active', true).order('occasion_date');
-      setOccasions(((data || []) as SpecialOccasion[]).map((o) => draftFromOccasion(o, occasionKeyOf(o))));
+      const [{ data }, { data: ms }] = await Promise.all([
+        supabase.from('special_occasions').select('*').eq('sponsor_id', sponsor.id).eq('active', true).order('occasion_date'),
+        supabase.from('monthly_sponsors').select('*').eq('sponsor_id', sponsor.id).is('deleted_at', null).limit(1).maybeSingle(),
+      ]);
+      const rows = (data || []) as SpecialOccasion[];
+      setOccasions(rows.map((o) => draftFromOccasion(o, occasionKeyOf(o))));
+      if (ms) setMonthly({ id: ms.id, day: ms.payment_day ? String(ms.payment_day) : '', amount: ms.monthly_amount != null ? String(ms.monthly_amount) : '', start_month: (ms.start_date || '').slice(0, 7), end_month: (ms.end_date || '').slice(0, 7) });
+      // Older sponsors have no category yet: take it from the monthly link or the first occasion.
+      if (!sponsor.sponsor_category) {
+        const first = rows[0];
+        const guess: DonationCategory | '' = ms ? 'Monthly' : first ? categoryOfType(occasionKeyOf(first), occasionCategory(first)) : '';
+        if (guess) setForm((f) => ({ ...f, sponsor_category: f.sponsor_category || guess }));
+      }
     })();
   }, [sponsor]);
+
+  const reminderDays = Math.max(0, Math.min(30, Number(form.reminder_days_before) || 0));
+  /** A new occasion reminds "Reminder days before" ahead (default 3) and on the day. */
+  const withReminder = (d: OccasionDraft): OccasionDraft => ({ ...d, remind_days_before: reminderDays > 0 ? [reminderDays, 0] : [0] });
+
+  /** Picking a category adds that occasion (once), with the right fields. */
+  function chooseCategory(category: DonationCategory) {
+    setForm((f) => ({ ...f, sponsor_category: category }));
+    const typeKey = CATEGORY_TYPE[category];
+    if (!typeKey) return;
+    const has = occasions.some((d) => ONE_TIME.includes(category) ? d.type_key === 'other' : categoryOfType(d.type_key, types.find((t) => t.key === d.type_key)?.category) === category);
+    if (has) return;
+    const draft = withReminder(newDraft(typeKey));
+    if (ONE_TIME.includes(category)) {
+      draft.repeat = { ...draft.repeat, recurrence: 'none' };
+      draft.occasion_name_en = category === 'Annadhanam' ? 'Annadhanam' : '';
+      draft.occasion_name_ta = category === 'Annadhanam' ? 'அன்னதானம்' : '';
+    }
+    setOccasions((all) => [...all, draft]);
+  }
 
   const sponsorDefaults = { name: form.full_name, dob: form.dob, phone: form.whatsapp || form.phone };
 
@@ -90,6 +150,27 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
       ...removedOccasionIds.map((id) => supabase.from('special_occasions').update({ active: false }).eq('id', id)),
     ]);
     return results.every((r) => !r.error);
+  }
+
+  /** Monthly Sponsor category: create or update the linked monthly sponsor. */
+  async function saveMonthly(sponsorId: string): Promise<boolean> {
+    if (form.sponsor_category !== 'Monthly') return true;
+    const mode = form.payment_mode === 'Bank Transfer' ? 'Bank' : ['Cash', 'UPI'].includes(form.payment_mode) ? form.payment_mode : null;
+    const row = {
+      name: form.full_name.trim(), phone: form.whatsapp.trim() || form.phone.trim() || null,
+      monthly_amount: Number(monthly.amount || form.sponsorship_amount) || null, payment_day: Number(monthly.day),
+      start_date: `${monthly.start_month}-01`, end_date: monthly.end_month ? lastDayOf(monthly.end_month) : null,
+      status: form.status === 'archived' ? 'stopped' : 'active', sponsor_id: sponsorId, relationship: 'Self',
+      address: form.address || null, payment_mode: mode,
+    };
+    const { error: err } = monthly.id
+      ? await supabase.from('monthly_sponsors').update(row).eq('id', monthly.id)
+      : await supabase.from('monthly_sponsors').insert({ ...row, created_by: appUser?.id || null });
+    if (err) {
+      setError(err.code === 'PGRST204' ? 'The sponsor was saved; the monthly details need database migration 00028.' : 'The sponsor was saved, but the monthly details could not be saved. Please try again.');
+      return false;
+    }
+    return true;
   }
 
   async function checkDuplicates(): Promise<Sponsor[]> {
@@ -114,6 +195,21 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
     if (!form.full_name.trim()) {
       setError('Full name is required.');
       return;
+    }
+    const category = form.sponsor_category;
+    if (!category) { setError('Choose a category.'); return; }
+    if (!isEdit && !form.whatsapp.trim()) { setError('Mobile (WhatsApp) is required.'); return; }
+    if (form.whatsapp.trim() && form.whatsapp.replace(/\D/g, '').length < 10) { setError('Enter a valid mobile (WhatsApp) number.'); return; }
+    if (!isEdit && category !== 'Monthly' && !(Number(form.sponsorship_amount) > 0)) { setError('Sponsorship amount is required.'); return; }
+    if (category === 'Monthly') {
+      const day = Number(monthly.day);
+      if (!(day >= 1 && day <= 31)) { setError('Monthly Sponsor: the monthly date (1–31) is required.'); return; }
+      if (!(Number(monthly.amount || form.sponsorship_amount) > 0)) { setError('Monthly Sponsor: the monthly amount is required.'); return; }
+      if (!monthly.start_month) { setError('Monthly Sponsor: the start month is required.'); return; }
+      if (monthly.end_month && monthly.end_month < monthly.start_month) { setError('Monthly Sponsor: the end month is before the start month.'); return; }
+    } else if (!ONE_TIME.includes(category)) {
+      const has = occasions.some((d) => categoryOfType(d.type_key, types.find((t) => t.key === d.type_key)?.category) === category);
+      if (!has) { setError(`${category}: add the ${category.toLowerCase()} details below.`); return; }
     }
     for (const d of occasions.filter((x) => !x.id || x.touched)) {
       const problem = validateDraft(d, types.find((t) => t.key === d.type_key), sponsorDefaults);
@@ -151,17 +247,24 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
       notes: form.notes || null,
       status: form.status,
       created_by: appUser?.id || null,
+      sponsor_category: category,
+      sponsorship_amount: form.sponsorship_amount ? Number(form.sponsorship_amount) : category === 'Monthly' && monthly.amount ? Number(monthly.amount) : null,
+      payment_mode: form.payment_mode || null,
+      reminder_days_before: reminderDays,
+      preferred_language: form.preferred_language || null,
     };
+    const { created_by: _createdBy, ...updatePayload } = payload;
 
     if (isEdit) {
       const { data, error: err } = await supabase
         .from('sponsors')
-        .update(payload)
+        .update(updatePayload)
         .eq('id', sponsor!.id)
         .select()
         .single();
       setBusy(false);
-      if (err) { setError('Unable to save sponsor. Please try again.'); return; }
+      if (err) { setError(err.code === 'PGRST204' ? 'The category fields need database migration 00028. Run it in the Supabase SQL Editor, then save again.' : 'Unable to save sponsor. Please try again.'); return; }
+      if (!(await saveMonthly(sponsor!.id))) return;
       // Auto-update sponsor birthday occasion if DOB changed
       if (form.dob && form.dob !== sponsor!.dob) {
         await supabase
@@ -184,8 +287,9 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
         .select()
         .single();
       setBusy(false);
-      if (err) { setError('Unable to save sponsor. Please try again.'); return; }
+      if (err) { setError(err.code === 'PGRST204' ? 'The category fields need database migration 00028. Run it in the Supabase SQL Editor, then save again.' : 'Unable to save sponsor. Please try again.'); return; }
       const newSponsor = data as Sponsor;
+      if (!(await saveMonthly(newSponsor.id))) { setCreatedId(newSponsor.id); onSaved?.(newSponsor); return; }
       // Only the occasions the user added become special days;
       // Date of Birth alone doesn't create one.
       if (!(await saveOccasions(newSponsor.id))) {
@@ -236,6 +340,74 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
       {error && (
         <div className="text-sm text-destructive bg-destructive/10 rounded-lg px-4 py-3">{error}</div>
       )}
+
+      <Card className="p-5 space-y-4">
+        <div>
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Category <span className="text-destructive">*</span></h3>
+          <p className="text-sm text-muted-foreground mt-0.5">The fields below change with the category.</p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="group" aria-label="Category">
+          {DONATION_CATEGORIES.map((c) => (
+            <button key={c} type="button" aria-pressed={form.sponsor_category === c} onClick={() => chooseCategory(c)}
+              className={cn('rounded-xl border p-2.5 text-left transition-colors', form.sponsor_category === c ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50')}>
+              <span className="text-lg">{CATEGORY_META[c].icon}</span>
+              <span className="block text-sm font-medium">{c}</span>
+              <span className="block text-xs text-muted-foreground">{CATEGORY_META[c].ta}</span>
+            </button>
+          ))}
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="sp-amount">Sponsorship amount (₹){!isEdit && form.sponsor_category !== 'Monthly' && <span className="text-destructive"> *</span>}</Label>
+            <Input id="sp-amount" type="number" min="0" inputMode="numeric" value={form.sponsorship_amount} onChange={(e) => set('sponsorship_amount', e.target.value)} placeholder="e.g. 5000" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Payment mode</Label>
+            <Select value={form.payment_mode || 'none'} onValueChange={(v) => set('payment_mode', v === 'none' ? '' : v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Not set</SelectItem>
+                {PAYMENT_MODES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="sp-remind">Reminder days before</Label>
+            <Input id="sp-remind" type="number" min="0" max="30" inputMode="numeric" value={form.reminder_days_before} onChange={(e) => set('reminder_days_before', e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Preferred language</Label>
+            <Select value={form.preferred_language} onValueChange={(v) => set('preferred_language', v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ta">தமிழ் Tamil</SelectItem>
+                <SelectItem value="en">English</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {form.sponsor_category === 'Monthly' && (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 rounded-xl border border-border p-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="m-day">Monthly date (1–31) <span className="text-destructive">*</span></Label>
+              <Input id="m-day" type="number" min="1" max="31" inputMode="numeric" value={monthly.day} onChange={(e) => setM('day', e.target.value)} placeholder="e.g. 5" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="m-amount">Monthly amount (₹) <span className="text-destructive">*</span></Label>
+              <Input id="m-amount" type="number" min="0" inputMode="numeric" value={monthly.amount} onChange={(e) => setM('amount', e.target.value)} placeholder={form.sponsorship_amount || 'e.g. 1000'} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="m-start">Start month <span className="text-destructive">*</span></Label>
+              <Input id="m-start" type="month" value={monthly.start_month} onChange={(e) => setM('start_month', e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="m-end">End month (optional)</Label>
+              <Input id="m-end" type="month" value={monthly.end_month} onChange={(e) => setM('end_month', e.target.value)} />
+            </div>
+            <p className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-4">Saved in Monthly Sponsors too (linked to this sponsor), with reminders {reminderDays} day{reminderDays === 1 ? '' : 's'} before the monthly date. Add the star there for star-day wishes.</p>
+          </div>
+        )}
+      </Card>
 
       <Card className="p-5 space-y-4">
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Basic Information</h3>
@@ -306,7 +478,7 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
             />
           </div>
         ))}
-        <Button type="button" variant="outline" onClick={() => setOccasions((all) => [...all, newDraft(all.length === 0 ? 'self_birthday' : 'family_birthday')])}>
+        <Button type="button" variant="outline" onClick={() => setOccasions((all) => [...all, withReminder(newDraft(all.length === 0 ? CATEGORY_TYPE[form.sponsor_category as DonationCategory] || 'self_birthday' : 'family_birthday'))])}>
           <Plus className="h-4 w-4 mr-2" />{occasions.length === 0 ? 'Add an occasion' : 'Add another occasion'}
         </Button>
       </Card>
@@ -315,12 +487,12 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Contact Details</h3>
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Phone</Label>
-            <Input value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+91 98765 43210" />
+            <Label>Mobile (WhatsApp){!isEdit && <span className="text-destructive"> *</span>}</Label>
+            <Input type="tel" value={form.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} placeholder="+91 98765 43210" />
           </div>
           <div className="space-y-1.5">
-            <Label>WhatsApp</Label>
-            <Input value={form.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} placeholder="+91 98765 43210" />
+            <Label>Alternate mobile</Label>
+            <Input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+91 98765 43210" />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label>Email</Label>

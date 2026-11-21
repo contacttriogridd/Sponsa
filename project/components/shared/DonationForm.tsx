@@ -13,6 +13,7 @@ import type { Donation } from '@/lib/types';
 import { DONATION_TYPES, FOOD_TYPES, formatCurrency, normalizeDonationType } from '@/lib/constants';
 import { CATEGORY_META, DONATION_CATEGORIES, PAYMENT_MODES, categoryOf, type DonationCategory } from '@/lib/donations';
 import { notifyDrawerDataChanged } from '@/lib/drawer-store';
+import { autoAcknowledge } from '@/components/shared/AcknowledgmentButton';
 import { useAuth } from '@/lib/auth-context';
 
 // food_quantity / food_description columns hold the item details for every donation type.
@@ -122,7 +123,8 @@ export function DonationForm({
 
     // Editing keeps who the donation belongs to; created_by stays the original recorder.
     const { created_by: _createdBy, ...editPayload } = payload;
-    const editRow = isEdit ? { ...editPayload, sponsor_id: donation!.sponsor_id, sponsor_type: donation!.sponsor_type || 'regular', monthly_sponsor_id: donation!.monthly_sponsor_id ?? null, ...(donation!.sponsor_type === 'walkin' ? { sponsor_name: form.walkin_name.trim() } : {}) } : payload;
+    // A new donation starts with the acknowledgment to the admin pending.
+    const editRow = isEdit ? { ...editPayload, sponsor_id: donation!.sponsor_id, sponsor_type: donation!.sponsor_type || 'regular', monthly_sponsor_id: donation!.monthly_sponsor_id ?? null, ...(donation!.sponsor_type === 'walkin' ? { sponsor_name: form.walkin_name.trim() } : {}) } : { ...payload, acknowledgment_status: 'pending' };
     const save = async (row: Record<string, unknown>) => (isEdit
       ? supabase.from('donations').update(row).eq('id', donation!.id).select().single()
       : supabase.from('donations').insert(row).select().single());
@@ -141,16 +143,15 @@ export function DonationForm({
       onSaved(data as Donation);
     } else {
       const newDonation = data as Donation;
+      // Automatic mode: the acknowledgment goes to Udhaya Sir now (in the background).
+      autoAcknowledge(newDonation, walkin ? form.walkin_name : sponsorName || '').then((r) => r && notifyDrawerDataChanged());
 
       if (monthly || walkin) { onSaved(newDonation); return; }
 
       // Sponsor totals are recalculated from donations by the database; only the contact date is set here.
       await supabase.from('sponsors').update({ last_contact_date: form.donation_date }).eq('id', sponsorId);
 
-      // Update sponsorship request status if linked
-      if (sponsorshipRequestId) {
-        await supabase.from('sponsorship_requests').update({ status: 'completed' }).eq('id', sponsorshipRequestId);
-      }
+      // A linked sponsorship request is marked Paid by the database (migration 00028).
 
       // Log interaction
       await supabase.from('interactions').insert({

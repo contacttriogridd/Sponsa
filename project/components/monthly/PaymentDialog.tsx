@@ -11,7 +11,9 @@ import { DatePicker } from '@/components/shared/DatePicker';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { todayIst } from '@/lib/monthly-sponsors';
-import type { MonthlyPayment, MonthlySponsor, PaymentMode } from '@/lib/types';
+import type { Donation, MonthlyPayment, MonthlySponsor, PaymentMode } from '@/lib/types';
+import { autoAcknowledge } from '@/components/shared/AcknowledgmentButton';
+import { notifyDrawerDataChanged } from '@/lib/drawer-store';
 
 const MODES: PaymentMode[] = ['Cash', 'UPI', 'Bank'];
 
@@ -62,6 +64,12 @@ export function PaymentDialog({ sponsor, month, payment, onOpenChange, onSaved }
       .single();
     setBusy(false);
     if (err) { setError('Unable to save. Please try again.'); return; }
+    // Paid writes a donation row (migration 00027); its acknowledgment goes to Udhaya Sir in automatic mode.
+    if (paid) {
+      const { data: donation } = await supabase.from('donations').select('*').eq('monthly_payment_id', (data as MonthlyPayment).id).maybeSingle();
+      if (donation && (donation as Donation).acknowledgment_status !== 'sent') autoAcknowledge(donation as Donation, sponsor.name);
+    }
+    notifyDrawerDataChanged();
     onSaved(data as MonthlyPayment);
     onOpenChange(false);
   }

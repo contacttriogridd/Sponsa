@@ -11,6 +11,8 @@ import { ThankYouDialog } from '@/components/shared/ThankYouDialog';
 import { supabase } from '@/lib/supabase/client';
 import type { DonationCategory } from '@/lib/donations';
 import type { Donation, Sponsor } from '@/lib/types';
+import { ackMessageFor, loadAckContext, markAckOpened } from '@/components/shared/AcknowledgmentButton';
+import { buildWhatsAppUrl } from '@/lib/whatsapp';
 
 export type DonorKind = 'regular' | 'monthly' | 'walkin';
 
@@ -72,6 +74,15 @@ export function RecordDonationDialog({ open, onOpenChange, preset, onSaved }: Pr
     onOpenChange(false);
     onSaved?.(donation);
     toast.success('Donation saved — Send Thanks now?');
+    // Manual mode: one tap sends the acknowledgment to Udhaya Sir (automatic mode already sent it).
+    const donorName = chosen?.name || donation.sponsor_name || 'Anonymous';
+    Promise.all([loadAckContext(), ackMessageFor(donation, donorName)]).then(([ctx, message]) => {
+      if (ctx.sendMode === 'automatic') return;
+      toast(`Send the acknowledgment to ${ctx.recipient.name}?`, {
+        duration: 20000,
+        action: { label: 'Open WhatsApp', onClick: () => { window.open(buildWhatsAppUrl(ctx.recipient.whatsapp, message), '_blank'); markAckOpened(donation, donorName, message); } },
+      });
+    });
     if (kind === 'walkin' || !chosen) return;
     if (kind === 'monthly') {
       const { data } = await supabase.from('monthly_sponsors').select('id, name, phone').eq('id', chosen.id).maybeSingle();

@@ -170,6 +170,8 @@ export function buildReminderItems(src: ReminderSources, today: string): Reminde
 
   for (const r of src.requests) {
     if (r.status === 'declined' || r.status === 'cancelled') continue;
+    // Created when a request was sent for an occasion or date the dashboard already lists.
+    if (r.source_log_id || r.related_event_id || r.monthly_sponsor_id) continue;
     const sponsor = sponsorById.get(r.sponsor_id);
     if (!sponsor) continue;
     const event = sponsorshipEvent(r);
