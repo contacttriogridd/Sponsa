@@ -15,6 +15,7 @@ import { SponsorForm } from '@/components/shared/SponsorForm';
 import { OccasionForm } from '@/components/shared/OccasionForm';
 import { SponsorWishDialog } from '@/components/shared/SponsorWishDialog';
 import { supabase } from '@/lib/supabase/client';
+import { RecordDonationButton } from '@/components/shared/RecordDonationDialog';
 import { useAuth } from '@/lib/auth-context';
 import { nextOccurrenceOf, daysUntil } from '@/lib/date-utils';
 import { occasionHeadline, occasionRelation } from '@/lib/occasion-text';
@@ -260,6 +261,7 @@ export function SponsorDetailDrawer({ sponsorId, occasionId, open }: { sponsorId
                 </Button>
                 <Button variant="outline" onClick={() => setDialog('followup')}><ListPlus className="h-4 w-4 mr-1.5" />Add follow-up</Button>
                 <Button variant="outline" onClick={() => setDialog('occasion')}><CalendarPlus className="h-4 w-4 mr-1.5" />Add special day</Button>
+                <RecordDonationButton variant="outline" preset={{ sponsorType: 'regular', sponsorId: s.id, sponsorName: s.full_name }} onSaved={() => load()} />
               </div>
 
               {/* Basic details */}

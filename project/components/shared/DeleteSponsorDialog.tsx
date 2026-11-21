@@ -15,10 +15,11 @@ interface DeleteSponsorDialogProps {
 
 // Every table below references sponsors(id) ON DELETE CASCADE, so deleting the
 // sponsor row removes all of these in the same database transaction.
+// Donations are not among them: since migration 00027 they are kept with the
+// sponsor's name (sponsor_id becomes empty), so every total stays correct.
 const RELATED: { table: string; label: string }[] = [
   { table: 'family_members', label: 'family members' },
   { table: 'special_occasions', label: 'special days' },
-  { table: 'donations', label: 'donations' },
   { table: 'sponsorship_requests', label: 'sponsorship requests' },
   { table: 'interactions', label: 'interactions' },
   { table: 'tasks', label: 'follow-up tasks' },
@@ -31,6 +32,7 @@ const CONFIRM_WORD = 'DELETE';
 
 export function DeleteSponsorDialog({ sponsor, onOpenChange, onDeleted }: DeleteSponsorDialogProps) {
   const [counts, setCounts] = useState<{ label: string; count: number }[] | null>(null);
+  const [donationCount, setDonationCount] = useState(0);
   const [confirmText, setConfirmText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -42,7 +44,9 @@ export function DeleteSponsorDialog({ sponsor, onOpenChange, onDeleted }: Delete
     (async () => {
       const results = await Promise.all(RELATED.map(({ table }) =>
         supabase.from(table).select('id', { count: 'exact', head: true }).eq('sponsor_id', sponsor.id)));
+      const { count: kept } = await supabase.from('donations').select('id', { count: 'exact', head: true }).eq('sponsor_id', sponsor.id);
       if (cancelled) return;
+      setDonationCount(kept || 0);
       setCounts(RELATED.map(({ label }, i) => ({ label, count: results[i].count || 0 })).filter((c) => c.count > 0));
     })();
     return () => { cancelled = true; };
@@ -88,6 +92,9 @@ export function DeleteSponsorDialog({ sponsor, onOpenChange, onDeleted }: Delete
             </>
           )}
         </div>
+        {donationCount > 0 && (
+          <p className="text-sm text-muted-foreground">Their {donationCount} donation{donationCount === 1 ? '' : 's'} stay in Donations under their name, so totals do not change.</p>
+        )}
 
         <div className="space-y-1.5">
           <label htmlFor="confirm-delete" className="text-sm">

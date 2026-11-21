@@ -187,8 +187,15 @@ export interface Donation {
   donation_id: string | null;
   /** Null for a monthly sponsor's donation (migration 00018). */
   sponsor_id: string;
-  sponsor_type?: 'regular' | 'monthly' | null;
+  sponsor_type?: 'regular' | 'monthly' | 'walkin' | null;
   monthly_sponsor_id?: string | null;
+  /** Migration 00027: name kept on the donation, category, sponsored day, monthly payment link, admin acknowledgment. */
+  sponsor_name?: string | null;
+  sponsor_category?: string | null;
+  occasion_date?: string | null;
+  monthly_payment_id?: string | null;
+  acknowledgment_status?: 'pending' | 'sent' | 'failed' | null;
+  acknowledgment_sent_at?: string | null;
   sponsorship_request_id: string | null;
   occasion_id: string | null;
   occasion_name: string | null;
@@ -321,6 +328,8 @@ export interface MonthlySponsor {
   sponsor_events?: SponsorEvent[];
   /** Set when this entry is a family member's star day, built from monthly_family_members. */
   family_of?: { parentId: string; parentName: string; relationship: string; memberId: string } | null;
+  /** Set when an admin deleted a sponsor who has donation history (migration 00027). */
+  deleted_at?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

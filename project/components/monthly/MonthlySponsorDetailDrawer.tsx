@@ -10,6 +10,7 @@ import { MonthlySponsorForm } from '@/components/monthly/MonthlySponsorForm';
 import { PaymentDialog } from '@/components/monthly/PaymentDialog';
 import { SendWishButton } from '@/components/monthly/SendWishButton';
 import { FamilyMembersSection } from '@/components/monthly/FamilyMembersSection';
+import { RecordDonationButton } from '@/components/shared/RecordDonationDialog';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDateShort } from '@/lib/constants';
 import { RAASIS, STARS, astroLabel } from '@/lib/natchathiram';
@@ -161,6 +162,7 @@ export function MonthlySponsorDetailDrawer({ monthlyId }: { monthlyId: string })
                 <Button variant="outline" onClick={() => setPaying(true)}>
                   <CheckCircle2 className="h-4 w-4 mr-1.5" />{currentPaid ? 'Edit this month' : 'Mark paid'}
                 </Button>
+                <RecordDonationButton variant="outline" preset={{ sponsorType: 'monthly', sponsorId: sponsor.id, sponsorName: sponsor.name, category: 'Monthly', occasionDate: thisMonth }} />
               </div>
 
               <Section title="Star & Raasi">

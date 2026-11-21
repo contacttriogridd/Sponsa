@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Gift, Plus, Trash2 } from 'lucide-react';
+import { Edit, Gift, Plus, Trash2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,50 +11,51 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DonationForm } from '@/components/shared/DonationForm';
 import { DeleteRecordDialog, type DeletableRecord } from '@/components/shared/DeleteRecordDialog';
+import { RecordDonationDialog } from '@/components/shared/RecordDonationDialog';
 import { ThankYouDialog } from '@/components/shared/ThankYouDialog';
 import { ThanksStatusButton } from '@/components/shared/ThanksStatusButton';
-import { toast } from 'sonner';
 import { openMonthlySponsorDrawer, useDrawerDataChanged } from '@/lib/drawer-store';
-import { SponsorPicker, type PickerOption } from '@/components/shared/SponsorPicker';
 import { thanksStatus } from '@/lib/messaging';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDate, normalizeDonationType } from '@/lib/constants';
+import { CATEGORY_META, categoryOf, sumDonations, totalsByCategory, type DonationCategory } from '@/lib/donations';
+import { todayIst } from '@/lib/monthly-sponsors';
+import { addDays } from '@/lib/star-days';
 import type { Donation, MessageLog, Sponsor } from '@/lib/types';
+
+type Row = Donation & {
+  sponsors?: { id: string; full_name: string; preferred_name: string | null; phone: string | null; whatsapp: string | null; email: string | null } | null;
+  monthly_sponsors?: { id: string; name: string; phone: string | null } | null;
+};
+
+const donorName = (d: Row) => d.sponsors?.full_name || d.monthly_sponsors?.name || d.sponsor_name || 'Unknown';
 
 export default function DonationsPage() {
   const { appUser } = useAuth();
   const [deleting, setDeleting] = useState<DeletableRecord | null>(null);
-  const [items, setItems] = useState<any[]>([]);
-  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
-  const [filter, setFilter] = useState('all');
+  const [items, setItems] = useState<Row[]>([]);
+  const [period, setPeriod] = useState('all');
+  const [category, setCategory] = useState<'all' | DonationCategory>('all');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [selectedSponsorId, setSelectedSponsorId] = useState('');
-  const [sponsorType, setSponsorType] = useState<'regular' | 'monthly'>('regular');
-  const [regularOptions, setRegularOptions] = useState<PickerOption[]>([]);
-  const [monthlyOptions, setMonthlyOptions] = useState<PickerOption[]>([]);
+  const [recording, setRecording] = useState(false);
+  const [editing, setEditing] = useState<Row | null>(null);
   const [logs, setLogs] = useState<MessageLog[]>([]);
   const [thanksFilter, setThanksFilter] = useState<'all' | 'sent' | 'pending'>('all');
-  const [thanking, setThanking] = useState<any | null>(null);
+  const [thanking, setThanking] = useState<Row | null>(null);
 
   const load = useCallback(async () => {
     const sponsorCols = 'id, full_name, preferred_name, phone, whatsapp, email';
-    const [d, s, m, l] = await Promise.all([
-      supabase.from('donations').select(`*, sponsors(${sponsorCols}), monthly_sponsors(id, name, phone)`).order('donation_date', { ascending: false }),
-      supabase.from('sponsors').select('id, full_name, phone, whatsapp').eq('status', 'active').order('full_name'),
-      supabase.from('monthly_sponsors').select('id, name, phone').order('name'),
+    const [d, l] = await Promise.all([
+      supabase.from('donations').select(`*, sponsors(${sponsorCols}), monthly_sponsors(id, name, phone)`).order('donation_date', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('message_logs').select('*').eq('message_type', 'donation_thanks'),
     ]);
     // Before migration 00018 there is no monthly sponsor link to join.
     const donations = d.error
       ? (await supabase.from('donations').select(`*, sponsors(${sponsorCols})`).order('donation_date', { ascending: false })).data
       : d.data;
-    setItems(donations || []);
-    setSponsors((s.data || []) as Sponsor[]);
-    setRegularOptions((s.data || []).map((x) => ({ id: x.id, name: x.full_name, phone: x.phone || x.whatsapp })));
-    setMonthlyOptions((m.error ? [] : m.data || []).map((x) => ({ id: x.id, name: x.name, phone: x.phone })));
+    setItems((donations || []) as Row[]);
     setLogs((l.error ? [] : l.data || []) as MessageLog[]);
     setLoading(false);
   }, []);
@@ -62,32 +63,34 @@ export default function DonationsPage() {
   useEffect(() => { load(); }, [load]);
   useDrawerDataChanged(load);
 
-  const now = new Date();
-  const filtered = items.filter((d) => {
-    const date = new Date(d.donation_date);
-    const matchFilter =
-      filter === 'all' ||
-      (filter === 'today' && date.toDateString() === now.toDateString()) ||
-      (filter === 'week' && (now.getTime() - date.getTime()) < 7 * 86400000) ||
-      (filter === 'month' && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()) ||
-      (filter === 'year' && date.getFullYear() === now.getFullYear());
-    const donorName: string = d.sponsors?.full_name || d.monthly_sponsors?.name || '';
-    const matchQuery = !query || donorName.toLowerCase().includes(query.toLowerCase()) || d.occasion_name?.toLowerCase().includes(query.toLowerCase());
+  // Dates are compared as IST calendar dates (YYYY-MM-DD).
+  const today = todayIst();
+  const inPeriod = useCallback((date: string) => (
+    period === 'all'
+    || (period === 'today' && date === today)
+    || (period === 'week' && date > addDays(today, -7) && date <= today)
+    || (period === 'month' && date.slice(0, 7) === today.slice(0, 7))
+    || (period === 'year' && date.slice(0, 4) === today.slice(0, 4))
+  ), [period, today]);
+
+  // Everything except the category filter: the chips show each category's share of this.
+  const base = useMemo(() => items.filter((d) => {
+    const q = query.toLowerCase();
+    const matchQuery = !q || donorName(d).toLowerCase().includes(q) || d.occasion_name?.toLowerCase().includes(q) || d.receipt_number?.toLowerCase().includes(q);
     const thanked = thanksStatus(d, logs).sent;
     const matchThanks = thanksFilter === 'all' || (thanksFilter === 'sent' ? thanked : !thanked);
-    return matchFilter && matchQuery && matchThanks;
-  });
+    return inPeriod(d.donation_date) && matchQuery && matchThanks;
+  }), [items, query, logs, thanksFilter, inPeriod]);
 
-  const total = filtered.reduce((a, d) => a + Number(d.amount || 0), 0);
+  const byCategory = useMemo(() => totalsByCategory(base), [base]);
+  const filtered = category === 'all' ? base : base.filter((d) => categoryOf(d) === category);
+  const total = sumDonations(filtered);
   const people = filtered.reduce((a, d) => a + Number(d.people_helped || 0), 0);
 
-  const options = sponsorType === 'monthly' ? monthlyOptions : regularOptions;
-  const selectedSponsor = options.find((o) => o.id === selectedSponsorId);
-
   /** Who to thank for a donation: the sponsor, or the monthly sponsor (not logged against a sponsor record). */
-  const thanksTarget = (d: any) => (d.monthly_sponsors
+  const thanksTarget = (d: Row) => (d.monthly_sponsors
     ? { sponsor: { id: d.monthly_sponsors.id, full_name: d.monthly_sponsors.name, preferred_name: null, phone: d.monthly_sponsors.phone, whatsapp: null, email: null } as Sponsor, logSponsorId: null }
-    : { sponsor: d.sponsors as Sponsor, logSponsorId: undefined });
+    : { sponsor: d.sponsors as unknown as Sponsor, logSponsorId: undefined });
 
   return (
     <AppLayout>
@@ -96,18 +99,17 @@ export default function DonationsPage() {
           <div>
             <p className="text-sm text-muted-foreground">Impact</p>
             <h1 className="text-2xl font-semibold mt-1">Donations</h1>
-            <p className="text-sm text-muted-foreground mt-1">Every contribution recorded and accounted for.</p>
+            <p className="text-sm text-muted-foreground mt-1">Every rupee received, in one list. All totals in the app are calculated from here.</p>
           </div>
-          <Button onClick={() => setShowForm(true)}>
+          <Button onClick={() => setRecording(true)}>
             <Plus className="h-4 w-4 mr-2" />Record Donation
           </Button>
         </div>
 
-        {/* Summary */}
         <div className="grid grid-cols-2 gap-3">
           <Card className="p-4 text-center">
             <div className="text-xl font-bold">{formatCurrency(total)}</div>
-            <div className="text-xs text-muted-foreground mt-1">Total Amount</div>
+            <div className="text-xs text-muted-foreground mt-1">{category === 'all' ? 'Total Amount' : `${category} total`} · {filtered.length} donation{filtered.length === 1 ? '' : 's'}</div>
           </Card>
           <Card className="p-4 text-center">
             <div className="text-xl font-bold">{people.toLocaleString()}</div>
@@ -115,30 +117,12 @@ export default function DonationsPage() {
           </Card>
         </div>
 
-        <Card className="p-3">
+        <Card className="p-3 space-y-3">
           <div className="flex flex-col md:flex-row gap-3">
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by sponsor or occasion..."
-              className="flex-1"
-            />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by sponsor, occasion or receipt no..." className="flex-1" />
             <div className="flex flex-wrap gap-1">
-              {[
-                { key: 'all', label: 'All' },
-                { key: 'today', label: 'Today' },
-                { key: 'week', label: 'This Week' },
-                { key: 'month', label: 'This Month' },
-                { key: 'year', label: 'This Year' },
-              ].map((f) => (
-                <Button
-                  key={f.key}
-                  variant={filter === f.key ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setFilter(f.key)}
-                >
-                  {f.label}
-                </Button>
+              {[['all', 'All'], ['today', 'Today'], ['week', 'This Week'], ['month', 'This Month'], ['year', 'This Year']].map(([key, label]) => (
+                <Button key={key} variant={period === key ? 'secondary' : 'ghost'} size="sm" onClick={() => setPeriod(key)}>{label}</Button>
               ))}
             </div>
             <div className="flex flex-wrap gap-1 md:border-l md:pl-3 border-border">
@@ -146,6 +130,17 @@ export default function DonationsPage() {
                 <Button key={key} variant={thanksFilter === key ? 'secondary' : 'ghost'} size="sm" onClick={() => setThanksFilter(key)}>{label}</Button>
               ))}
             </div>
+          </div>
+          {/* Category filter: each chip shows that category's sum for the period above. */}
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Category">
+            <Button size="sm" variant={category === 'all' ? 'secondary' : 'outline'} className="h-auto py-1" onClick={() => setCategory('all')}>
+              All categories <span className="ml-1.5 text-muted-foreground">{formatCurrency(byCategory.total)}</span>
+            </Button>
+            {byCategory.rows.filter((r) => r.count > 0 || category === r.category).map((r) => (
+              <Button key={r.category} size="sm" variant={category === r.category ? 'secondary' : 'outline'} className="h-auto py-1" onClick={() => setCategory(r.category)}>
+                {CATEGORY_META[r.category].icon} {r.category} <span className="ml-1.5 text-muted-foreground">{formatCurrency(r.amount)} · {r.count}</span>
+              </Button>
+            ))}
           </div>
         </Card>
 
@@ -156,44 +151,45 @@ export default function DonationsPage() {
             {filtered.map((d) => (
               <Card key={d.id} className="p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-success/10 flex items-center justify-center">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
                       <Gift className="h-5 w-5 text-success" />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {d.monthly_sponsors ? (
-                          <button type="button" onClick={() => openMonthlySponsorDrawer(d.monthly_sponsors.id)} className="font-semibold hover:text-primary text-left">
-                            {d.monthly_sponsors.name}
-                          </button>
+                          <button type="button" onClick={() => openMonthlySponsorDrawer(d.monthly_sponsors!.id)} className="font-semibold hover:text-primary text-left">{d.monthly_sponsors.name}</button>
+                        ) : d.sponsor_id && d.sponsors ? (
+                          <Link href={`/sponsors/${d.sponsor_id}`} className="font-semibold hover:text-primary">{d.sponsors.full_name}</Link>
                         ) : (
-                          <Link href={`/sponsors/${d.sponsor_id}`} className="font-semibold hover:text-primary">
-                            {d.sponsors?.full_name || 'Unknown'}
-                          </Link>
+                          <span className="font-semibold">{donorName(d)}</span>
                         )}
-                        {d.sponsor_type === 'monthly' && <Badge variant="outline" className="text-xs">Monthly</Badge>}
+                        <Badge variant="secondary" className="text-xs font-normal">{CATEGORY_META[categoryOf(d)].icon} {categoryOf(d)}</Badge>
+                        {d.sponsor_type === 'walkin' && <Badge variant="outline" className="text-xs">Walk-in</Badge>}
                         <Badge variant="outline" className="text-xs">{normalizeDonationType(d.type)}</Badge>
                         {d.food_type && <Badge variant="outline" className="text-xs">{d.food_type}</Badge>}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {formatDate(d.donation_date)}
+                        {d.occasion_date && d.occasion_date !== d.donation_date ? ` · for ${formatDate(d.occasion_date)}` : ''}
                         {d.occasion_name ? ` · ${d.occasion_name}` : ''}
+                        {d.payment_method ? ` · ${d.payment_method}` : ''}
                         {d.people_helped ? ` · ${d.people_helped} people` : ''}
-                        {d.location ? ` · ${d.location}` : ''}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center justify-end gap-2 shrink-0">
-                    <ThanksStatusButton donation={d as Donation} logs={logs} onSend={() => setThanking(d)} />
+                    {(d.sponsors || d.monthly_sponsors) && <ThanksStatusButton donation={d} logs={logs} onSend={() => setThanking(d)} />}
                     <div className="text-right">
                       <div className="font-bold text-success">{formatCurrency(Number(d.amount))}</div>
-                      {d.donation_id && <div className="text-xs text-muted-foreground">{d.donation_id}</div>}
+                      {(d.receipt_number || d.donation_id) && <div className="text-xs text-muted-foreground">{d.receipt_number || d.donation_id}</div>}
                     </div>
+                    <Button variant="ghost" size="icon" aria-label="Edit donation" onClick={() => setEditing(d)}><Edit className="h-4 w-4" /></Button>
                     {appUser?.role === 'admin' && (
                       <Button variant="ghost" size="icon" className="text-destructive" aria-label="Delete donation"
                         onClick={() => setDeleting({
                           kind: 'donation', id: d.id, sponsor_id: d.sponsor_id, amount: d.amount, people_helped: d.people_helped,
-                          label: `${d.sponsors?.full_name || d.monthly_sponsors?.name || 'Sponsor'} — ${normalizeDonationType(d.type)} donation on ${formatDate(d.donation_date)}`,
+                          label: `${donorName(d)} — ${formatCurrency(Number(d.amount))} on ${formatDate(d.donation_date)}`,
                         })}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -205,67 +201,38 @@ export default function DonationsPage() {
             {filtered.length === 0 && (
               <Card className="py-14 text-center">
                 <Gift className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-                <h3 className="font-semibold">No donations recorded yet</h3>
-                <p className="text-sm text-muted-foreground mt-1">Record your first donation to get started.</p>
+                <h3 className="font-semibold">{items.length ? 'No donations match these filters' : 'No donations recorded yet'}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{items.length ? 'Try another period or category.' : 'Record your first donation to get started.'}</p>
               </Card>
             )}
           </div>
         )}
       </div>
 
-      {/* Quick record dialog */}
-      <Dialog open={showForm} onOpenChange={setShowForm}>
+      <RecordDonationDialog open={recording} onOpenChange={setRecording} onSaved={() => load()} />
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Record Donation</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Sponsor Type</label>
-              <div className="flex gap-1">
-                {([['regular', 'Sponsors'], ['monthly', 'Monthly Sponsors']] as const).map(([key, label]) => (
-                  <Button key={key} type="button" size="sm" variant={sponsorType === key ? 'secondary' : 'ghost'} onClick={() => { setSponsorType(key); setSelectedSponsorId(''); }}>
-                    {label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Select Sponsor</label>
-              <SponsorPicker
-                options={options}
-                value={selectedSponsorId}
-                onChange={setSelectedSponsorId}
-                placeholder={sponsorType === 'monthly' ? 'Choose a monthly sponsor...' : 'Choose a sponsor...'}
-              />
-            </div>
-            {selectedSponsor && (
-              <DonationForm
-                key={`${sponsorType}-${selectedSponsorId}`}
-                sponsorId={selectedSponsorId}
-                sponsorType={sponsorType}
-                sponsorName={selectedSponsor.name}
-                onSaved={(saved) => {
-                  setShowForm(false);
-                  const donor = selectedSponsor;
-                  const monthly = sponsorType === 'monthly';
-                  setSelectedSponsorId('');
-                  load();
-                  toast.success('Donation saved — Send Thanks now?');
-                  setTimeout(() => {
-                    if (monthly) setThanking({ ...saved, monthly_sponsors: { id: donor.id, name: donor.name, phone: donor.phone } });
-                    else supabase.from('sponsors').select('*').eq('id', donor.id).single().then(({ data }) => setThanking({ ...saved, sponsors: data }));
-                  }, 400);
-                }}
-                onCancel={() => { setShowForm(false); setSelectedSponsorId(''); }}
-              />
-            )}
-          </div>
+          <DialogHeader><DialogTitle>Edit Donation</DialogTitle></DialogHeader>
+          {editing && (
+            <DonationForm
+              key={editing.id}
+              donation={editing}
+              sponsorId={editing.sponsor_id || editing.monthly_sponsor_id || ''}
+              sponsorType={(editing.sponsor_type as 'regular' | 'monthly' | 'walkin') || 'regular'}
+              sponsorName={donorName(editing)}
+              onSaved={() => { setEditing(null); load(); }}
+              onCancel={() => setEditing(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
+
       {(thanking?.sponsors || thanking?.monthly_sponsors) && (
         <ThankYouDialog
           sponsor={thanksTarget(thanking).sponsor}
           logSponsorId={thanksTarget(thanking).logSponsorId}
-          donation={thanking as Donation}
+          donation={thanking}
           onOpenChange={(o) => { if (!o) setThanking(null); }}
           onSent={() => load()}
         />
@@ -273,7 +240,7 @@ export default function DonationsPage() {
       <DeleteRecordDialog
         record={deleting}
         onOpenChange={(open) => { if (!open) setDeleting(null); }}
-        onDeleted={(rec) => setItems((prev) => prev.filter((x) => x.id !== rec.id))}
+        onDeleted={() => load()}
       />
     </AppLayout>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { openSponsorDrawer } from '@/lib/drawer-store';
 import { Plus, Search, Phone, MessageCircle, Mail, ChevronRight, UserRound, Trash2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -16,6 +16,15 @@ import { useAuth } from '@/lib/auth-context';
 import { DeleteSponsorDialog } from '@/components/shared/DeleteSponsorDialog';
 import { EVENT_LABELS, EVENT_TABS, byNext, eventsBySponsor, isEventTab, type EventTab, type SponsorEvent } from '@/lib/event-categories';
 import { cn } from '@/lib/utils';
+import { RecordDonationButton } from '@/components/shared/RecordDonationDialog';
+import { totalsBySponsor, type DonationCategory } from '@/lib/donations';
+import { useDrawerDataChanged } from '@/lib/drawer-store';
+
+/** The donation category a sponsors tab records into. */
+const TAB_CATEGORY: Record<EventTab, DonationCategory> = {
+  all: 'General', birthday: 'Birthday', child_birthday: 'Birthday', wedding_anniversary: 'Wedding Anniversary',
+  death_anniversary: 'Memorial (Thithi)', other: 'Other',
+};
 
 const dayMonth = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
@@ -28,6 +37,7 @@ export default function SponsorsPage() {
   const [filter, setFilter] = useState('active');
   const [tab, setTab] = useState<EventTab>('all');
   const [loading, setLoading] = useState(true);
+  const [totals, setTotals] = useState<Map<string, number>>(new Map());
 
   // ?q= from the header search and ?event= for the selected tab.
   useEffect(() => {
@@ -38,17 +48,20 @@ export default function SponsorsPage() {
     if (isEventTab(event)) setTab(event);
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      const [s, o] = await Promise.all([
-        supabase.from('sponsors').select('*').order('full_name'),
-        supabase.from('special_occasions').select('*').eq('active', true),
-      ]);
-      setSponsors((s.data || []) as Sponsor[]);
-      setOccasions((o.data || []) as SpecialOccasion[]);
-      setLoading(false);
-    })();
+  const load = useCallback(async () => {
+    const [s, o, d] = await Promise.all([
+      supabase.from('sponsors').select('*').order('full_name'),
+      supabase.from('special_occasions').select('*').eq('active', true),
+      // Each sponsor's total is calculated from their donation rows.
+      supabase.from('donations').select('sponsor_id, amount').not('sponsor_id', 'is', null),
+    ]);
+    setSponsors((s.data || []) as Sponsor[]);
+    setOccasions((o.data || []) as SpecialOccasion[]);
+    setTotals(totalsBySponsor((d.data || []) as { sponsor_id: string; amount: number; donation_date: string }[]));
+    setLoading(false);
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useDrawerDataChanged(load);
 
   function selectTab(next: EventTab) {
     setTab(next);
@@ -87,7 +100,10 @@ export default function SponsorsPage() {
             <h1 className="text-2xl font-semibold mt-1">Sponsors</h1>
             <p className="text-sm text-muted-foreground mt-1">Keep every important connection close.</p>
           </div>
-          <Link href="/sponsors/new"><Button><Plus className="h-4 w-4 mr-2" />Add Sponsor</Button></Link>
+          <div className="flex gap-2">
+            <RecordDonationButton variant="outline" preset={{ category: TAB_CATEGORY[tab] }} onSaved={() => load()} />
+            <Link href="/sponsors/new"><Button><Plus className="h-4 w-4 mr-2" />Add Sponsor</Button></Link>
+          </div>
         </div>
 
         <div className="-mx-4 px-4 lg:mx-0 lg:px-0 overflow-x-auto scrollbar-thin">
@@ -151,7 +167,7 @@ export default function SponsorsPage() {
                     {s.email && <a href={`mailto:${s.email}`}><Button variant="outline" size="icon"><Mail className="h-4 w-4" /></Button></a>}
                   </div>
                   <div className="hidden md:block w-28 text-right">
-                    <div className="font-semibold text-sm">{formatCurrency(Number(s.total_donations || 0))}</div>
+                    <div className="font-semibold text-sm">{formatCurrency(totals.get(s.id) || 0)}</div>
                     <div className="text-xs text-muted-foreground">donated</div>
                   </div>
                   {appUser?.role === 'admin' && (

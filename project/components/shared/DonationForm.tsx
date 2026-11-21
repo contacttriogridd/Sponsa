@@ -10,7 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/lib/supabase/client';
 import type { Donation } from '@/lib/types';
-import { DONATION_TYPES, FOOD_TYPES, PAYMENT_METHODS, formatCurrency, normalizeDonationType } from '@/lib/constants';
+import { DONATION_TYPES, FOOD_TYPES, formatCurrency, normalizeDonationType } from '@/lib/constants';
+import { CATEGORY_META, DONATION_CATEGORIES, PAYMENT_MODES, categoryOf, type DonationCategory } from '@/lib/donations';
+import { notifyDrawerDataChanged } from '@/lib/drawer-store';
 import { useAuth } from '@/lib/auth-context';
 
 // food_quantity / food_description columns hold the item details for every donation type.
@@ -34,10 +36,14 @@ const DESCRIPTION_HINTS: Record<string, string> = {
 };
 
 interface DonationFormProps {
+  /** Empty for a walk-in donation. */
   sponsorId: string;
-  /** 'monthly' when sponsorId is a monthly sponsor. */
-  sponsorType?: 'regular' | 'monthly';
+  /** 'monthly' when sponsorId is a monthly sponsor; 'walkin' for a donor with no sponsor record. */
+  sponsorType?: 'regular' | 'monthly' | 'walkin';
   sponsorName?: string;
+  /** Pre-filled category and sponsored day, e.g. when recorded from a sponsor's occasion. */
+  defaultCategory?: DonationCategory;
+  occasionDate?: string;
   sponsorshipRequestId?: string;
   occasionId?: string;
   occasionName?: string;
@@ -48,7 +54,7 @@ interface DonationFormProps {
 
 export function DonationForm({
   sponsorId, sponsorType = 'regular', sponsorName, sponsorshipRequestId, occasionId, occasionName,
-  donation, onSaved, onCancel,
+  defaultCategory, occasionDate, donation, onSaved, onCancel,
 }: DonationFormProps) {
   const { appUser } = useAuth();
   const isEdit = !!donation;
@@ -68,6 +74,9 @@ export function DonationForm({
     notes: donation?.notes || '',
     occasion_name: donation?.occasion_name || occasionName || '',
     status: donation?.status || 'completed',
+    sponsor_category: (donation ? categoryOf(donation) : defaultCategory || (sponsorType === 'monthly' ? 'Monthly' : 'General')) as DonationCategory,
+    occasion_date: donation?.occasion_date || occasionDate || '',
+    walkin_name: donation?.sponsor_type === 'walkin' ? donation.sponsor_name || '' : '',
   });
 
   const [error, setError] = useState('');
@@ -80,13 +89,18 @@ export function DonationForm({
   async function handleSubmit() {
     if (isMoney && (!form.amount || isNaN(Number(form.amount)))) { setError('Valid amount is required.'); return; }
     if (form.amount && isNaN(Number(form.amount))) { setError('Enter a valid value.'); return; }
+    const walkin = sponsorType === 'walkin';
+    if (walkin && !form.walkin_name.trim()) { setError("Enter the donor's name (or \"Anonymous\")."); return; }
     setBusy(true); setError('');
 
     const monthly = sponsorType === 'monthly';
     const payload = {
-      // A monthly sponsor's donation links to monthly_sponsors instead.
-      sponsor_id: monthly ? null : sponsorId,
+      // A monthly sponsor's donation links to monthly_sponsors instead; a walk-in keeps just the name.
+      sponsor_id: monthly || walkin ? null : sponsorId,
       ...(monthly ? { sponsor_type: 'monthly', monthly_sponsor_id: sponsorId } : {}),
+      ...(walkin ? { sponsor_type: 'walkin', sponsor_name: form.walkin_name.trim() } : {}),
+      sponsor_category: form.sponsor_category,
+      occasion_date: form.occasion_date || null,
       sponsorship_request_id: sponsorshipRequestId || null,
       occasion_id: occasionId || null,
       occasion_name: form.occasion_name || null,
@@ -106,30 +120,32 @@ export function DonationForm({
       created_by: appUser?.id || null,
     };
 
-    if (isEdit) {
-      const { data, error: err } = await supabase
-        .from('donations').update(payload).eq('id', donation!.id).select().single();
+    // Editing keeps who the donation belongs to; created_by stays the original recorder.
+    const { created_by: _createdBy, ...editPayload } = payload;
+    const editRow = isEdit ? { ...editPayload, sponsor_id: donation!.sponsor_id, sponsor_type: donation!.sponsor_type || 'regular', monthly_sponsor_id: donation!.monthly_sponsor_id ?? null, ...(donation!.sponsor_type === 'walkin' ? { sponsor_name: form.walkin_name.trim() } : {}) } : payload;
+    const save = async (row: Record<string, unknown>) => (isEdit
+      ? supabase.from('donations').update(row).eq('id', donation!.id).select().single()
+      : supabase.from('donations').insert(row).select().single());
+    const { data, error: err } = await save(editRow);
+    if (err?.code === 'PGRST204' && /'(sponsor_category|occasion_date|sponsor_name)'/.test(err.message)) {
       setBusy(false);
-      if (err) { setError('Unable to save donation. Please try again.'); return; }
+      setError('Recording donations needs database migration 00027. Run it in the Supabase SQL Editor, then try again.');
+      return;
+    }
+    setBusy(false);
+    if (err) { setError('Unable to save donation. Please try again.'); return; }
+    // Every list and total re-reads the donations table.
+    notifyDrawerDataChanged();
+
+    if (isEdit) {
       onSaved(data as Donation);
     } else {
-      const { data, error: err } = await supabase
-        .from('donations').insert(payload).select().single();
-      setBusy(false);
-      if (err) { setError('Unable to save donation. Please try again.'); return; }
       const newDonation = data as Donation;
 
-      if (monthly) { onSaved(newDonation); return; }
+      if (monthly || walkin) { onSaved(newDonation); return; }
 
-      // Update sponsor totals
-      const { data: sponsor } = await supabase.from('sponsors').select('total_donations,people_helped').eq('id', sponsorId).single();
-      if (sponsor) {
-        await supabase.from('sponsors').update({
-          total_donations: Number(sponsor.total_donations || 0) + (Number(form.amount) || 0),
-          people_helped: Number(sponsor.people_helped || 0) + Number(form.people_helped || 0),
-          last_contact_date: form.donation_date,
-        }).eq('id', sponsorId);
-      }
+      // Sponsor totals are recalculated from donations by the database; only the contact date is set here.
+      await supabase.from('sponsors').update({ last_contact_date: form.donation_date }).eq('id', sponsorId);
 
       // Update sponsorship request status if linked
       if (sponsorshipRequestId) {
@@ -153,7 +169,13 @@ export function DonationForm({
   return (
     <div className="space-y-4">
       {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>}
-      {sponsorName && (
+      {sponsorType === 'walkin' && (
+        <div className="space-y-1.5">
+          <Label htmlFor="walkin-name">Donor name <span className="text-destructive">*</span></Label>
+          <Input id="walkin-name" value={form.walkin_name} onChange={(e) => set('walkin_name', e.target.value)} placeholder='Name, or "Anonymous"' />
+        </div>
+      )}
+      {sponsorName && sponsorType !== 'walkin' && (
         <div className="p-3 rounded-lg bg-muted text-sm">
           <span className="text-muted-foreground">Sponsor: </span>
           <span className="font-medium">{sponsorName}</span>
@@ -177,6 +199,15 @@ export function DonationForm({
             ))}
           </div>
         </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label>Category <span className="text-destructive">*</span></Label>
+          <Select value={form.sponsor_category} onValueChange={(v) => set('sponsor_category', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {DONATION_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{CATEGORY_META[c].icon} {c} · {CATEGORY_META[c].ta}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-1.5">
           <Label>Donation Date</Label>
           <DatePicker value={form.donation_date} onChange={(v) => set('donation_date', v)} />
@@ -186,6 +217,10 @@ export function DonationForm({
             {isMoney ? <>Amount (₹) <span className="text-destructive">*</span></> : 'Estimated Value (₹)'}
           </Label>
           <Input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} placeholder={isMoney ? '15000' : 'Optional'} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Sponsored day (occasion date)</Label>
+          <DatePicker value={form.occasion_date} onChange={(v) => set('occasion_date', v)} />
         </div>
         <div className="space-y-1.5">
           <Label>Occasion</Label>
@@ -213,7 +248,8 @@ export function DonationForm({
           <Select value={form.payment_method} onValueChange={(v) => set('payment_method', v)}>
             <SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger>
             <SelectContent>
-              {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              {PAYMENT_MODES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              {form.payment_method && !(PAYMENT_MODES as readonly string[]).includes(form.payment_method) && <SelectItem value={form.payment_method}>{form.payment_method}</SelectItem>}
             </SelectContent>
           </Select>
         </div>
@@ -223,7 +259,7 @@ export function DonationForm({
         </div>
         <div className="space-y-1.5">
           <Label>Receipt Number</Label>
-          <Input value={form.receipt_number} onChange={(e) => set('receipt_number', e.target.value)} placeholder="RCPT001" />
+          <Input value={form.receipt_number} onChange={(e) => set('receipt_number', e.target.value)} placeholder="Automatic (VPT-2026-00001)" />
         </div>
         <div className="space-y-1.5">
           <Label>{isFood ? 'Food Quantity' : 'Quantity'}</Label>

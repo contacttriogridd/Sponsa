@@ -5,6 +5,7 @@ import { AlertTriangle, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase/client';
+import { notifyDrawerDataChanged } from '@/lib/drawer-store';
 
 export type DeletableRecord =
   | { kind: 'donation'; id: string; sponsor_id: string | null; amount: number | null; people_helped: number | null; label: string }
@@ -32,16 +33,8 @@ export function DeleteRecordDialog({ record, onOpenChange, onDeleted }: DeleteRe
     if (err) { setBusy(false); setError(`Unable to delete this ${NOUN[record.kind]}. Please try again.`); return; }
     if (!data?.length) { setBusy(false); setError(`Only admins can delete ${NOUN[record.kind]}s.`); return; }
 
-    // Recording a donation added to the sponsor's running totals, so take it back off.
-    if (record.kind === 'donation' && record.sponsor_id) {
-      const { data: sponsor } = await supabase.from('sponsors').select('total_donations,people_helped').eq('id', record.sponsor_id).single();
-      if (sponsor) {
-        await supabase.from('sponsors').update({
-          total_donations: Math.max(0, Number(sponsor.total_donations || 0) - Number(record.amount || 0)),
-          people_helped: Math.max(0, Number(sponsor.people_helped || 0) - Number(record.people_helped || 0)),
-        }).eq('id', record.sponsor_id);
-      }
-    }
+    // Sponsor totals are recalculated from donations by the database (migration 00027).
+    notifyDrawerDataChanged();
 
     setBusy(false);
     onDeleted(record);
@@ -57,7 +50,7 @@ export function DeleteRecordDialog({ record, onOpenChange, onDeleted }: DeleteRe
           </DialogTitle>
           <DialogDescription>
             <strong className="text-foreground">{record?.label}</strong> will be permanently deleted. This cannot be undone.
-            {record?.kind === 'donation' && " The sponsor's total donations and people helped will be reduced to match."}
+            {record?.kind === 'donation' && ' Every total (Donations, Dashboard, Reports, the sponsor) updates to match.'}
             {record?.kind === 'sponsorship' && ' Any follow-up tasks for it are deleted too; donations recorded against it are kept.'}
           </DialogDescription>
         </DialogHeader>

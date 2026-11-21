@@ -20,6 +20,14 @@ import { OBSERVANCE_KEYS, OBSERVANCE_META, shortDay, type ObservanceKey, type Ob
 import { loadObservances } from '@/lib/observances-store';
 import { nextSponsorEvent, sponsorEventsOf } from '@/lib/event-wishes';
 import { cn } from '@/lib/utils';
+import { MoreVertical } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { RecordDonationDialog, type DonationPreset } from '@/components/shared/RecordDonationDialog';
+import { useAuth } from '@/lib/auth-context';
+import { toast } from 'sonner';
+import { donationMonth, sumDonations } from '@/lib/donations';
+import type { Donation } from '@/lib/types';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDateShort } from '@/lib/constants';
 import { RAASIS, STARS, astroLabel, isValidCombination } from '@/lib/natchathiram';
@@ -51,11 +59,17 @@ export default function MonthlySponsorsPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [eventFilter, setEventFilter] = useState<'all' | ObservanceKey>('all');
   const [events, setEvents] = useState<ObservanceView[]>([]);
+  const [monthDonations, setMonthDonations] = useState<Donation[]>([]);
+  const [recordFor, setRecordFor] = useState<DonationPreset | null>(null);
+  const [deletingSponsor, setDeletingSponsor] = useState<Row | null>(null);
+  const { appUser } = useAuth();
+  const isAdmin = appUser?.role === 'admin';
 
   const loadSponsors = useCallback(async () => {
     const { data, error } = await supabase.from('monthly_sponsors').select('*, sponsors(full_name, whatsapp, phone)').order('name');
     if (error) { setNotReady(true); setLoading(false); return; }
-    const rows = (data || []) as Row[];
+    // Deleted sponsors with donation history are kept (deleted_at), but not listed.
+    const rows = ((data || []) as Row[]).filter((r) => !r.deleted_at);
     setSponsors(rows);
     const { data: members } = await supabase.from('monthly_family_members').select('*').order('created_at');
     const byParent = new Map<string, MonthlyFamilyMember[]>();
@@ -70,8 +84,14 @@ export default function MonthlySponsorsPage() {
   }, [today]);
 
   const loadPayments = useCallback(async () => {
-    const { data } = await supabase.from('monthly_payments').select('*').eq('month', month);
+    const [{ data }, { data: dons }] = await Promise.all([
+      supabase.from('monthly_payments').select('*').eq('month', month),
+      // Money is counted from donations (Mark paid writes one too, migration 00027), by the month it is for.
+      supabase.from('donations').select('*').not('monthly_sponsor_id', 'is', null)
+        .gte('donation_date', shiftMonth(month, -2)).lt('donation_date', shiftMonth(month, 3)),
+    ]);
     setPayments((data || []) as MonthlyPayment[]);
+    setMonthDonations(((dons || []) as Donation[]).filter((d) => donationMonth(d) === month));
   }, [month]);
 
   useEffect(() => { loadSponsors(); }, [loadSponsors]);
@@ -85,16 +105,42 @@ export default function MonthlySponsorsPage() {
   useDrawerDataChanged(reloadAll);
 
   const paymentBySponsor = useMemo(() => new Map(payments.map((p) => [p.monthly_sponsor_id, p])), [payments]);
+  const donatedBySponsor = useMemo(() => {
+    const map = new Map<string, Donation[]>();
+    for (const d of monthDonations) map.set(d.monthly_sponsor_id!, [...(map.get(d.monthly_sponsor_id!) || []), d]);
+    return map;
+  }, [monthDonations]);
+  /** Paid this month: marked paid, or a donation recorded for this month. */
+  const isPaid = useCallback((id: string) => paymentBySponsor.get(id)?.status === 'paid' || (donatedBySponsor.get(id)?.length || 0) > 0, [paymentBySponsor, donatedBySponsor]);
 
   const summary = useMemo(() => {
     const active = sponsors.filter((s) => s.status === 'active');
     const expected = active.reduce((a, s) => a + Number(s.monthly_amount || 0), 0);
-    const collected = payments.filter((p) => p.status === 'paid').reduce((a, p) => a + Number(p.amount || 0), 0);
+    const collected = sumDonations(monthDonations);
     const pending = active
-      .filter((s) => paymentBySponsor.get(s.id)?.status !== 'paid')
+      .filter((s) => !isPaid(s.id))
       .reduce((a, s) => a + Number(paymentBySponsor.get(s.id)?.amount ?? s.monthly_amount ?? 0), 0);
     return { activeCount: active.length, expected, collected, pending };
-  }, [sponsors, payments, paymentBySponsor]);
+  }, [sponsors, monthDonations, paymentBySponsor, isPaid]);
+
+  async function setStatus(s: Row, status: Row['status']) {
+    const { error } = await supabase.from('monthly_sponsors').update({ status }).eq('id', s.id);
+    if (error) { toast.error('Unable to change the status.'); return; }
+    toast.success(`${s.name} is now ${MONTHLY_STATUS_LABELS[status]}.`);
+    loadSponsors();
+  }
+
+  async function deleteSponsor(s: Row) {
+    const { data, error } = await supabase.rpc('delete_monthly_sponsor', { p_id: s.id });
+    if (error) {
+      toast.error(error.code === 'PGRST202' ? 'Deleting needs database migration 00027.' : /admin/i.test(error.message) ? 'Only an admin can delete monthly sponsors.' : 'Unable to delete. Please try again.');
+      return;
+    }
+    toast.success(data === 'archived'
+      ? `${s.name} was removed from the list. Their donations stay in Donations and every total.`
+      : `${s.name} was deleted.`);
+    loadSponsors(); loadPayments();
+  }
 
   const filtered = sponsors.filter((s) => {
     if (filter !== 'all' && s.status !== filter) return false;
@@ -120,6 +166,9 @@ export default function MonthlySponsorsPage() {
             <Link href="/monthly-sponsors/star-calendar">
               <Button variant="outline"><CalendarDays className="h-4 w-4 mr-2" />Star Calendar</Button>
             </Link>
+            <Button variant="outline" onClick={() => setRecordFor({ sponsorType: 'monthly', category: 'Monthly', occasionDate: month })} disabled={notReady}>
+              <IndianRupee className="h-4 w-4 mr-2" />Record Donation
+            </Button>
             <Button onClick={() => { setEditing(null); setShowForm(true); }} disabled={notReady}>
               <Plus className="h-4 w-4 mr-2" />Add Monthly Sponsor
             </Button>
@@ -251,6 +300,8 @@ export default function MonthlySponsorsPage() {
                             <div className="font-semibold text-sm">{s.monthly_amount != null ? formatCurrency(Number(s.monthly_amount)) : '—'}</div>
                             {payment?.status === 'paid' ? (
                               <div className="text-xs text-success">Paid{payment.paid_on ? ` ${formatDateShort(payment.paid_on)}` : ''}{payment.mode ? ` · ${payment.mode}` : ''}</div>
+                            ) : donatedBySponsor.get(s.id)?.length ? (
+                              <div className="text-xs text-success">Received {formatCurrency(sumDonations(donatedBySponsor.get(s.id)!))}</div>
                             ) : (
                               <div className="text-xs text-muted-foreground">Pending</div>
                             )}
@@ -262,6 +313,24 @@ export default function MonthlySponsorsPage() {
                           <Button variant="ghost" size="icon" aria-label={`Edit ${s.name}`} onClick={() => { setEditing(s); setShowForm(true); }}>
                             <Edit className="h-4 w-4" />
                           </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" aria-label={`More actions for ${s.name}`}><MoreVertical className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setRecordFor({ sponsorType: 'monthly', sponsorId: s.id, sponsorName: s.name, category: 'Monthly', occasionDate: month })}>Record Donation</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setEditing(s); setShowForm(true); }}>Edit</DropdownMenuItem>
+                              {s.status === 'active'
+                                ? <DropdownMenuItem onClick={() => setStatus(s, 'stopped')}>Mark Inactive</DropdownMenuItem>
+                                : <DropdownMenuItem onClick={() => setStatus(s, 'active')}>Mark Active</DropdownMenuItem>}
+                              {isAdmin && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingSponsor(s)}>Delete…</DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                     </Card>
@@ -298,6 +367,18 @@ export default function MonthlySponsorsPage() {
           payment={paying ? paymentBySponsor.get(paying.id) : undefined}
           onOpenChange={(o) => !o && setPaying(null)}
           onSaved={() => loadPayments()}
+        />
+
+        <RecordDonationDialog open={!!recordFor} onOpenChange={(o) => !o && setRecordFor(null)} preset={recordFor} onSaved={() => loadPayments()} />
+
+        <ConfirmDialog
+          open={!!deletingSponsor}
+          onOpenChange={(o) => !o && setDeletingSponsor(null)}
+          title={`Delete ${deletingSponsor?.name || 'monthly sponsor'}?`}
+          description="If this sponsor has donations, they are kept in Donations and every total, and the sponsor is only removed from this list. Otherwise the sponsor, their family members and payment months are deleted. This cannot be undone."
+          confirmLabel="Delete"
+          destructive
+          onConfirm={() => { if (deletingSponsor) deleteSponsor(deletingSponsor); setDeletingSponsor(null); }}
         />
       </div>
     </AppLayout>

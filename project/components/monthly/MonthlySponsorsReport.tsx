@@ -8,7 +8,8 @@ import { supabase } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/constants';
 import { RAASIS, STARS } from '@/lib/natchathiram';
 import { monthKey, shiftMonth, todayIst } from '@/lib/monthly-sponsors';
-import type { MonthlyPayment, MonthlySponsor } from '@/lib/types';
+import type { Donation, MonthlyPayment, MonthlySponsor } from '@/lib/types';
+import { donationMonth, sumDonations } from '@/lib/donations';
 
 interface MonthTotal { month: string; collected: number; pending: number }
 
@@ -34,21 +35,25 @@ export function MonthlySponsorsReport() {
     (async () => {
       const thisMonth = monthKey(todayIst());
       const from = shiftMonth(thisMonth, -5);
-      const [{ data, error }, { data: payments }] = await Promise.all([
+      const [{ data, error }, { data: payments }, { data: dons }] = await Promise.all([
         supabase.from('monthly_sponsors').select('*'),
         supabase.from('monthly_payments').select('*').gte('month', from).lte('month', thisMonth),
+        // Collected = monthly sponsors' donation rows (Mark paid writes one too), by the month they are for.
+        supabase.from('donations').select('*').not('monthly_sponsor_id', 'is', null).gte('donation_date', shiftMonth(from, -2)),
       ]);
       if (error) return; // migration 00011 not applied yet: hide the section
       const list = (data || []) as MonthlySponsor[];
       const pays = (payments || []) as MonthlyPayment[];
+      const donations = (dons || []) as Donation[];
       const active = list.filter((s) => s.status === 'active');
       setSponsors(list);
       setMonths(Array.from({ length: 6 }, (_, i) => shiftMonth(from, i)).map((month) => {
         const ofMonth = pays.filter((p) => p.month === month);
-        const paidIds = new Set(ofMonth.filter((p) => p.status === 'paid').map((p) => p.monthly_sponsor_id));
+        const donated = donations.filter((d) => donationMonth(d) === month);
+        const paidIds = new Set([...ofMonth.filter((p) => p.status === 'paid').map((p) => p.monthly_sponsor_id), ...donated.map((d) => d.monthly_sponsor_id!)]);
         return {
           month,
-          collected: ofMonth.filter((p) => p.status === 'paid').reduce((a, p) => a + Number(p.amount || 0), 0),
+          collected: sumDonations(donated),
           pending: active.filter((s) => !paidIds.has(s.id)).reduce((a, s) => a + Number(s.monthly_amount || 0), 0),
         };
       }).reverse());

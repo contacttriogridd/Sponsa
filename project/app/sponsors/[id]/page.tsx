@@ -23,6 +23,7 @@ import { SponsorForm } from '@/components/shared/SponsorForm';
 import { FamilyMemberForm } from '@/components/shared/FamilyMemberForm';
 import { OccasionForm } from '@/components/shared/OccasionForm';
 import { DonationForm } from '@/components/shared/DonationForm';
+import { sumDonations } from '@/lib/donations';
 import { SponsorshipForm } from '@/components/shared/SponsorshipForm';
 import { Timeline } from '@/components/shared/Timeline';
 import type { TimelineEvent } from '@/components/shared/Timeline';
@@ -238,7 +239,7 @@ export default function SponsorDetailPage() {
           {/* Stats row */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5 border-t border-border">
             <div className="text-center">
-              <div className="text-lg font-bold">{formatCurrency(Number(sponsor.total_donations || 0))}</div>
+              <div className="text-lg font-bold">{formatCurrency(sumDonations(donations))}</div>
               <div className="text-xs text-muted-foreground">Total Donated</div>
             </div>
             <div className="text-center">

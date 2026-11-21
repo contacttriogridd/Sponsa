@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/constants';
 import { MonthlySponsorsReport } from '@/components/monthly/MonthlySponsorsReport';
+import { CATEGORY_META, sumDonations, totalsByCategory } from '@/lib/donations';
+import { todayIst } from '@/lib/monthly-sponsors';
 
 interface ReportData {
   totalSponsors: number;
@@ -21,6 +23,7 @@ interface ReportData {
   confirmedRequests: number;
   completedRequests: number;
   declinedRequests: number;
+  byCategory: ReturnType<typeof totalsByCategory>;
 }
 
 function downloadCSV(data: any[], filename: string) {
@@ -45,30 +48,30 @@ export default function ReportsPage() {
 
   useEffect(() => {
     (async () => {
-      const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+      // IST calendar dates (a local-midnight Date turned into UTC started the month a day early).
+      const today = todayIst();
+      const monthStart = `${today.slice(0, 7)}-01`;
+      const yearStart = `${today.slice(0, 4)}-01-01`;
 
-      const [sponsors, donations, requests, monthDon, yearDon] = await Promise.all([
+      const [sponsors, donations, requests] = await Promise.all([
         supabase.from('sponsors').select('id,status'),
-        supabase.from('donations').select('amount,people_helped'),
+        supabase.from('donations').select('*'),
         supabase.from('sponsorship_requests').select('status'),
-        supabase.from('donations').select('amount').gte('donation_date', monthStart),
-        supabase.from('donations').select('amount').gte('donation_date', yearStart),
       ]);
 
       const allSponsors = sponsors.data || [];
-      const allDonations = donations.data || [];
+      const allDonations = (donations.data || []) as { amount: number; people_helped: number; donation_date: string }[];
       const allRequests = requests.data || [];
 
       setReport({
         totalSponsors: allSponsors.length,
         activeSponsors: allSponsors.filter((s) => s.status === 'active').length,
         totalDonations: allDonations.length,
-        totalAmount: allDonations.reduce((a, d) => a + Number(d.amount || 0), 0),
+        totalAmount: sumDonations(allDonations),
         totalPeople: allDonations.reduce((a, d) => a + Number(d.people_helped || 0), 0),
-        monthlyAmount: (monthDon.data || []).reduce((a, d) => a + Number(d.amount || 0), 0),
-        yearlyAmount: (yearDon.data || []).reduce((a, d) => a + Number(d.amount || 0), 0),
+        monthlyAmount: sumDonations(allDonations.filter((d) => d.donation_date >= monthStart && d.donation_date <= today)),
+        yearlyAmount: sumDonations(allDonations.filter((d) => d.donation_date >= yearStart && d.donation_date <= today)),
+        byCategory: totalsByCategory(allDonations),
         confirmedRequests: allRequests.filter((r) => r.status === 'confirmed').length,
         completedRequests: allRequests.filter((r) => r.status === 'completed').length,
         declinedRequests: allRequests.filter((r) => r.status === 'declined').length,
@@ -175,6 +178,25 @@ export default function ReportsPage() {
               );
             })}
           </div>
+        )}
+
+        {report && (
+          <Card className="p-5">
+            <h2 className="font-semibold">Donations by category</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Every category adds up to the total — all figures come from the Donations list.</p>
+            <div className="mt-3 divide-y divide-border rounded-xl border border-border text-sm">
+              {report.byCategory.rows.map((r) => (
+                <div key={r.category} className="flex items-center justify-between px-3 py-2">
+                  <span>{CATEGORY_META[r.category].icon} {r.category} <span className="text-muted-foreground">· {CATEGORY_META[r.category].ta}</span></span>
+                  <span className="tabular-nums"><span className="text-muted-foreground mr-3">{r.count}</span>{formatCurrency(r.amount)}</span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between px-3 py-2 font-semibold bg-muted/50">
+                <span>Total</span>
+                <span className="tabular-nums"><span className="text-muted-foreground mr-3 font-normal">{report.byCategory.count}</span>{formatCurrency(report.byCategory.total)}</span>
+              </div>
+            </div>
+          </Card>
         )}
 
         <MonthlySponsorsReport />
