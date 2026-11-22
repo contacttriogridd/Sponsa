@@ -36,6 +36,8 @@ import { ThankYouDialog } from '@/components/shared/ThankYouDialog';
 import { ThanksStatusButton } from '@/components/shared/ThanksStatusButton';
 import { MessageHistory } from '@/components/shared/MessageHistory';
 import { useDrawerDataChanged } from '@/lib/drawer-store';
+import { PhoneLink } from '@/components/shared/PhoneLink';
+import { buildCallLink, displayPhone } from '@/lib/phone';
 
 type DialogType = 'edit' | 'addFamily' | 'editFamily' | 'addOccasion' | 'editOccasion' | 'addDonation' | 'addSponsorship' | null;
 
@@ -200,12 +202,12 @@ export default function SponsorDetailPage() {
             <div className="flex flex-wrap gap-2 sm:flex-col sm:items-end">
               <div className="flex gap-2">
                 {sponsor.phone && (
-                  <a href={`tel:${sponsor.phone}`}><Button variant="outline" size="icon"><Phone className="h-4 w-4" /></Button></a>
+                  <PhoneLink href={buildCallLink(sponsor.phone)} onEdit={() => setDialog('edit')}><Button variant="outline" size="icon" aria-label="Call"><Phone className="h-4 w-4" /></Button></PhoneLink>
                 )}
-                {sponsor.whatsapp && (
-                  <a href={buildWhatsAppUrl(sponsor.whatsapp)} target="_blank" rel="noreferrer">
-                    <Button variant="outline" size="icon"><MessageCircle className="h-4 w-4" /></Button>
-                  </a>
+                {(sponsor.whatsapp || sponsor.phone) && (
+                  <PhoneLink href={buildWhatsAppUrl(sponsor.whatsapp || sponsor.phone)} newTab onEdit={() => setDialog('edit')}>
+                    <Button variant="outline" size="icon" aria-label="WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
+                  </PhoneLink>
                 )}
                 {sponsor.email && (
                   <a href={`mailto:${sponsor.email}`}><Button variant="outline" size="icon"><Mail className="h-4 w-4" /></Button></a>
