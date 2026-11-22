@@ -1,3 +1,4 @@
+import { INVALID_PHONE_MESSAGE, normalizePhone } from '@/lib/phone';
 /**
  * Server-only WhatsApp Cloud API sender. Credentials stay in server env vars
  * and never reach the browser. Used by /api/whatsapp/send and the daily
@@ -20,13 +21,16 @@ export interface WhatsAppSendResult {
 export async function sendWhatsAppText(phone: string, message: string): Promise<WhatsAppSendResult> {
   const config = whatsappApiConfig();
   if (!config) return { configured: false, success: false, error: 'WhatsApp API is not configured.' };
+  // Same normalizer as the app: a number without +91 is fixed, an invalid one is never sent.
+  const to = normalizePhone(phone)?.waDigits;
+  if (!to) return { configured: true, success: false, error: INVALID_PHONE_MESSAGE };
   try {
     const response = await fetch(`https://graph.facebook.com/v18.0/${config.phoneNumberId}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messaging_product: 'whatsapp',
-        to: phone.replace(/\D/g, ''),
+        to,
         type: 'text',
         text: { body: message },
       }),

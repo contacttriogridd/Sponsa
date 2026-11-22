@@ -92,11 +92,11 @@ export function SendWishButton({ sponsor, starDate, size = 'sm' }: SendWishButto
   return (
     <div className="inline-flex" onClick={(e) => e.stopPropagation()}>
       {composed && number ? (
-        <a href={buildWhatsAppUrl(number, composed.text)} target="_blank" rel="noreferrer" onClick={() => onDirectSend(composed.text)}>
+        <a href={buildWhatsAppUrl(number, composed.text) || undefined} target="_blank" rel="noreferrer" onClick={() => onDirectSend(composed.text)}>
           {sendButton}
         </a>
       ) : (
-        // No number: show the message so it can be sent from the right chat or copied.
+        // No valid number: the message dialog says so (with Edit contact) and offers Copy.
         <span onClick={() => composed && setEditing(true)}>{sendButton}</span>
       )}
       <Button

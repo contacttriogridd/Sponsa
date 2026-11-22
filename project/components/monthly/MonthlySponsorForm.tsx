@@ -16,6 +16,7 @@ import { useAuth } from '@/lib/auth-context';
 import { RAASIS, STARS, astroLabel, isValidCombination, padamNote, raasisOfStar, starsInRaasi } from '@/lib/natchathiram';
 import { MONTHLY_STATUS_LABELS } from '@/lib/monthly-sponsors';
 import type { MonthlySponsor, MonthlySponsorStatus, PaymentMode } from '@/lib/types';
+import { PhoneInput, phoneForSave } from '@/components/shared/PhoneInput';
 
 interface SponsorOption { id: string; full_name: string }
 
@@ -83,11 +84,13 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
     // A star day or at least one monthly event: otherwise the sponsor never gets a wish.
     if (form.star == null && events.length === 0) { setError('Choose a Natchathiram (star) or at least one Monthly Event.'); return; }
     if (events.some((e) => e.amount.trim() !== '' && !(Number(e.amount) >= 0))) { setError('Event amounts must be numbers.'); return; }
+    const phone = phoneForSave(form.phone);
+    if (phone.error) { setError(`Phone / WhatsApp: ${phone.error}.`); return; }
     if (invalidCombo && !confirmInvalid) { setConfirmInvalid(true); return; }
     setBusy(true); setError('');
     const payload = {
       name: form.name.trim(),
-      phone: form.phone.trim() || null,
+      phone: phone.value,
       dob: form.dob || null,
       raasi: form.raasi,
       star: form.star,
@@ -145,7 +148,7 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="ms-phone">Phone / WhatsApp</Label>
-          <Input id="ms-phone" type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+91 98765 43210" />
+          <PhoneInput id="ms-phone" value={form.phone} onChange={(v) => set('phone', v)} />
         </div>
         <div className="space-y-1.5">
           <Label>Date of Birth</Label>

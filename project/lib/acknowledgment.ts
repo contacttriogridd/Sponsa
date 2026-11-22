@@ -5,7 +5,7 @@
 
 import { categoryOf } from '@/lib/donations';
 import { formatDateLabel } from '@/lib/messaging';
-import { normalizeIndianNumber } from '@/lib/phone';
+import { normalizePhone } from '@/lib/phone';
 
 export interface AckRecipient {
   name: string;
@@ -20,7 +20,7 @@ export function ackRecipientFrom(row: Record<string, unknown> | null | undefined
   const number = (row?.ack_whatsapp as string) || (row?.admin_whatsapp_number as string) || DEFAULT_ACK_RECIPIENT.whatsapp;
   return {
     name: (row?.ack_name as string) || (row?.admin_name as string) || DEFAULT_ACK_RECIPIENT.name,
-    whatsapp: normalizeIndianNumber(number) || number.replace(/\D/g, ''),
+    whatsapp: normalizePhone(number)?.waDigits || number,
     email: (row?.ack_email as string) || '',
   };
 }

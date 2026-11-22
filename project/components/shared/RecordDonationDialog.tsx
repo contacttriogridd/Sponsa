@@ -13,6 +13,7 @@ import type { DonationCategory } from '@/lib/donations';
 import type { Donation, Sponsor } from '@/lib/types';
 import { ackMessageFor, loadAckContext, markAckOpened } from '@/components/shared/AcknowledgmentButton';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
+import { warnInvalidPhone } from '@/components/shared/PhoneLink';
 
 export type DonorKind = 'regular' | 'monthly' | 'walkin';
 
@@ -80,7 +81,11 @@ export function RecordDonationDialog({ open, onOpenChange, preset, onSaved }: Pr
       if (ctx.sendMode === 'automatic') return;
       toast(`Send the acknowledgment to ${ctx.recipient.name}?`, {
         duration: 20000,
-        action: { label: 'Open WhatsApp', onClick: () => { window.open(buildWhatsAppUrl(ctx.recipient.whatsapp, message), '_blank'); markAckOpened(donation, donorName, message); } },
+        action: { label: 'Open WhatsApp', onClick: () => {
+          const link = buildWhatsAppUrl(ctx.recipient.whatsapp, message);
+          if (!link) { warnInvalidPhone({ editHref: '/settings' }, "The acknowledgment recipient's number is invalid. Please update it in Settings."); return; }
+          window.open(link, '_blank'); markAckOpened(donation, donorName, message);
+        } },
       });
     });
     if (kind === 'walkin' || !chosen) return;

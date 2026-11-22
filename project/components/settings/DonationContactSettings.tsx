@@ -10,9 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import { ackRecipientFrom } from '@/lib/acknowledgment';
-import { normalizeIndianNumber } from '@/lib/phone';
 import { clearAckContext } from '@/components/shared/AcknowledgmentButton';
 import { clearWishContext } from '@/lib/star-wish';
+import { PhoneInput, phoneForSave } from '@/components/shared/PhoneInput';
 
 /**
  * Settings: who gets the acknowledgment for every donation (Udhaya Sir), and
@@ -31,7 +31,7 @@ export function DonationContactSettings() {
       if (!data) return;
       const r = ackRecipientFrom(data);
       setOrgId(data.id);
-      setForm({ ack_name: r.name, ack_whatsapp: r.whatsapp.replace(/^91/, ''), ack_email: r.email, upi_id: data.upi_id || '', bank_details: data.bank_details || '' });
+      setForm({ ack_name: r.name, ack_whatsapp: r.whatsapp, ack_email: r.email, upi_id: data.upi_id || '', bank_details: data.bank_details || '' });
     });
   }, []);
 
@@ -39,8 +39,8 @@ export function DonationContactSettings() {
 
   async function save() {
     if (!orgId) { setStatus({ ok: false, text: 'Save the main Settings once first.' }); return; }
-    const number = normalizeIndianNumber(form.ack_whatsapp);
-    if (!number) { setStatus({ ok: false, text: 'Acknowledgment WhatsApp must be a 10-digit Indian mobile number.' }); return; }
+    const number = phoneForSave(form.ack_whatsapp).value;
+    if (!number) { setStatus({ ok: false, text: 'Acknowledgment WhatsApp: enter a valid 10-digit mobile number.' }); return; }
     if (form.ack_email.trim() && !/^\S+@\S+\.\S+$/.test(form.ack_email.trim())) { setStatus({ ok: false, text: 'Enter a valid email, or leave it empty.' }); return; }
     setBusy(true);
     const { error } = await supabase.from('organization_settings').update({
@@ -66,7 +66,7 @@ export function DonationContactSettings() {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="ack-wa">WhatsApp number</Label>
-          <Input id="ack-wa" inputMode="tel" value={form.ack_whatsapp} onChange={(e) => set('ack_whatsapp', e.target.value)} disabled={!isAdmin} placeholder="9629522777" />
+          <PhoneInput id="ack-wa" value={form.ack_whatsapp} onChange={(v) => set('ack_whatsapp', v)} disabled={!isAdmin} placeholder="96295 22777" />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="ack-email">Email (optional)</Label>

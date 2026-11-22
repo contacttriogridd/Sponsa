@@ -1,3 +1,4 @@
+import { buildWhatsAppLink } from '@/lib/phone';
 import { supabase } from '@/lib/supabase/client';
 import type { Sponsor } from '@/lib/types';
 
@@ -99,10 +100,11 @@ export async function sendWhatsAppMessage(
   }
 }
 
-/** wa.me link; the message is percent-encoded as UTF-8 so Tamil text and line breaks survive. */
-export function buildWhatsAppUrl(phone: string, message?: string): string {
-  const cleaned = phone.replace(/\D/g, '');
-  const base = `https://wa.me/${cleaned}`;
-  if (message) return `${base}?text=${encodeURIComponent(message)}`;
-  return base;
+/**
+ * wa.me link for a phone number, via the shared normalizer (lib/phone.ts):
+ * null when the number is missing or invalid, so WhatsApp never opens the
+ * "Send to…" picker or a "missing country code" error.
+ */
+export function buildWhatsAppUrl(phone: string | null | undefined, message?: string | null): string | null {
+  return buildWhatsAppLink(phone, message);
 }

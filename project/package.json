@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "node --import ./tests/register.mjs --test tests/recurrence.test.ts tests/messaging.test.ts tests/occasion.test.ts tests/event-categories.test.ts tests/festival.test.ts tests/thank-you.test.ts tests/observances.test.ts tests/event-wishes.test.ts tests/donations.test.ts tests/phase2.test.ts"
+    "test": "node --import ./tests/register.mjs --test tests/recurrence.test.ts tests/messaging.test.ts tests/occasion.test.ts tests/event-categories.test.ts tests/festival.test.ts tests/thank-you.test.ts tests/observances.test.ts tests/event-wishes.test.ts tests/donations.test.ts tests/phase2.test.ts tests/phone-export.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -55,6 +55,7 @@
     "embla-carousel-react": "^8.3.0",
     "eslint": "8.49.0",
     "eslint-config-next": "13.5.11",
+    "exceljs": "^4.4.0",
     "input-otp": "^1.2.4",
     "lucide-react": "^0.446.0",
     "next": "13.5.11",

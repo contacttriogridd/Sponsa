@@ -9,7 +9,12 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/constants';
 import { MonthlySponsorsReport } from '@/components/monthly/MonthlySponsorsReport';
-import { CATEGORY_META, sumDonations, totalsByCategory } from '@/lib/donations';
+import { CATEGORY_META, categoryOf, sumDonations, totalsByCategory, totalsBySponsor } from '@/lib/donations';
+import { downloadCsv } from '@/lib/export-download';
+import { ddmmyyyy, exportPhone, plainAmount } from '@/lib/export';
+import { MonthlyReportDownload } from '@/components/shared/MonthlyReportDownload';
+import { SPONSORSHIP_STATUS_LABELS, normalizeDonationType } from '@/lib/constants';
+
 import { todayIst } from '@/lib/monthly-sponsors';
 
 interface ReportData {
@@ -26,21 +31,6 @@ interface ReportData {
   byCategory: ReturnType<typeof totalsByCategory>;
 }
 
-function downloadCSV(data: any[], filename: string) {
-  if (!data.length) return;
-  const headers = Object.keys(data[0]);
-  const rows = data.map((row) =>
-    headers.map((h) => JSON.stringify(row[h] ?? '')).join(',')
-  );
-  const csv = [headers.join(','), ...rows].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 export default function ReportsPage() {
   const [report, setReport] = useState<ReportData | null>(null);
@@ -80,38 +70,49 @@ export default function ReportsPage() {
     })();
   }, []);
 
+  // Explicit columns, dates as DD-MM-YYYY, amounts as plain numbers, phones as +91 text, UTF-8 BOM.
   async function exportSponsors() {
     const { data } = await supabase.from('sponsors').select('*').order('full_name');
-    if (data) downloadCSV(data, 'sponsors.csv');
+    const { data: dons } = await supabase.from('donations').select('sponsor_id, amount').not('sponsor_id', 'is', null);
+    const totals = totalsBySponsor((dons || []) as { sponsor_id: string; amount: number; donation_date: string }[]);
+    downloadCsv([
+      ['Name', 'Mobile (WhatsApp)', 'Alternate mobile', 'Email', 'City', 'Category', 'Status', 'Total Donations (₹)', 'Created On'],
+      ...(data || []).map((x: any) => [x.full_name, exportPhone(x.whatsapp), exportPhone(x.phone), x.email, x.city, x.sponsor_category, x.status, totals.get(x.id) || 0, ddmmyyyy(x.created_at)]),
+    ], 'sponsors.csv');
   }
 
   async function exportDonations() {
     let { data, error } = await supabase
       .from('donations')
-      .select('*, sponsors(full_name), monthly_sponsors(name)')
+      .select('*, sponsors(full_name, phone, whatsapp), monthly_sponsors(name, phone)')
       .order('donation_date', { ascending: false });
     if (error) {
       // Before migration 00018 there is no monthly sponsor link.
-      ({ data } = await supabase.from('donations').select('*, sponsors(full_name)').order('donation_date', { ascending: false }));
+      ({ data } = await supabase.from('donations').select('*, sponsors(full_name, phone, whatsapp)').order('donation_date', { ascending: false }));
     }
-    if (data) {
-      const flat = data.map((d: any) => ({
-        ...d, sponsor_name: d.sponsors?.full_name || d.monthly_sponsors?.name, sponsor_type: d.sponsor_type || 'regular',
-        sponsors: undefined, monthly_sponsors: undefined,
-      }));
-      downloadCSV(flat, 'donations.csv');
-    }
+    downloadCsv([
+      ['Donation Date', 'Sponsor Name', 'Phone', 'Category', 'Donation Type', 'Monthly Sponsor', 'Occasion / Note', 'Amount (₹)', 'Payment Mode', 'Receipt No', 'People Helped'],
+      ...(data || []).map((d: any) => [
+        ddmmyyyy(d.donation_date), d.sponsors?.full_name || d.monthly_sponsors?.name || d.sponsor_name || 'Anonymous',
+        exportPhone(d.sponsors?.whatsapp || d.sponsors?.phone || d.monthly_sponsors?.phone), categoryOf(d), normalizeDonationType(d.type),
+        d.sponsor_type === 'monthly' || d.monthly_sponsor_id ? 'Yes' : 'No', [d.occasion_name, d.notes].filter(Boolean).join(' — '),
+        plainAmount(d.amount), d.payment_method, d.receipt_number, d.people_helped || 0,
+      ]),
+    ], 'donations.csv');
   }
 
   async function exportSponsorships() {
     const { data } = await supabase
       .from('sponsorship_requests')
-      .select('*, sponsors(full_name)')
+      .select('*, sponsors(full_name), monthly_sponsors(name)')
       .order('created_at', { ascending: false });
-    if (data) {
-      const flat = data.map((r) => ({ ...r, sponsor_name: (r.sponsors as any)?.full_name, sponsors: undefined }));
-      downloadCSV(flat, 'sponsorships.csv');
-    }
+    downloadCsv([
+      ['Sponsor', 'Occasion', 'Special Date', 'Status', 'Category', 'Requested Amount (₹)', 'Requested On', 'Channel', 'Notes'],
+      ...(data || []).map((r: any) => [
+        r.sponsors?.full_name || r.monthly_sponsors?.name, r.occasion_name, ddmmyyyy(r.special_date), SPONSORSHIP_STATUS_LABELS[r.status] || r.status,
+        r.category, r.requested_amount != null ? plainAmount(r.requested_amount) : '', ddmmyyyy(r.request_sent_at || r.created_at), r.channel, r.notes,
+      ]),
+    ], 'sponsorships.csv');
   }
 
   async function exportOccasions() {
@@ -119,10 +120,13 @@ export default function ReportsPage() {
       .from('special_occasions')
       .select('*, sponsors(full_name)')
       .order('occasion_date');
-    if (data) {
-      const flat = data.map((o) => ({ ...o, sponsor_name: (o.sponsors as any)?.full_name, sponsors: undefined }));
-      downloadCSV(flat, 'occasions.csv');
-    }
+    downloadCsv([
+      ['Sponsor', 'Person', 'Relationship', 'Occasion', 'Date', 'Repeats Yearly', 'Contact', 'Contact Phone', 'Active'],
+      ...(data || []).map((o: any) => [
+        o.sponsors?.full_name, o.person_name, o.relationship, o.occasion_name_en || o.occasion_type, ddmmyyyy(o.occasion_date),
+        o.recurring_yearly ? 'Yes' : 'No', o.contact_name, exportPhone(o.contact_phone), o.active ? 'Yes' : 'No',
+      ]),
+    ], 'occasions.csv');
   }
 
   const metrics = report ? [
@@ -179,6 +183,14 @@ export default function ReportsPage() {
             })}
           </div>
         )}
+
+        <Card className="p-5 space-y-3">
+          <div>
+            <h2 className="font-semibold">Monthly Donation Report</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Every donation in the month with date, sponsor, phone, amount and thanks status, plus totals and a sponsor summary.</p>
+          </div>
+          <MonthlyReportDownload />
+        </Card>
 
         {report && (
           <Card className="p-5">

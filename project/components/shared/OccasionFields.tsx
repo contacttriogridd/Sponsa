@@ -17,6 +17,7 @@ import { YearlyDatesField } from '@/components/shared/YearlyDatesField';
 import { AstroCombobox } from '@/components/monthly/AstroCombobox';
 import { STARS } from '@/lib/natchathiram';
 import { THITHIS, TAMIL_MONTHS } from '@/lib/tamil-month-names';
+import { PhoneInput, phoneForSave } from '@/components/shared/PhoneInput';
 
 const NONE = 'none';
 
@@ -192,7 +193,7 @@ export function OccasionFields({ value, onChange, types, sponsor }: OccasionFiel
             </div>
             <div className="space-y-1.5">
               <Label>Contact phone / WhatsApp{(family || remembrance) && <span className="text-destructive"> *</span>}</Label>
-              <Input type="tel" value={value.contact_phone} onChange={(e) => set({ contact_phone: e.target.value })} placeholder={sponsor.phone || '+91 98765 43210'} />
+              <PhoneInput value={value.contact_phone} onChange={(v) => set({ contact_phone: v })} placeholder="Sponsor's number if empty" />
             </div>
             {!other && (
               <div className="space-y-1.5">

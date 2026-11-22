@@ -41,6 +41,8 @@ import { loadStarCalendar } from '@/lib/star-calendar-store';
 import { openMonthlySponsorDrawer, useDrawerDataChanged } from '@/lib/drawer-store';
 import type { MonthlyFamilyMember, MonthlyPayment, MonthlySponsor } from '@/lib/types';
 import { relationshipLabel } from '@/lib/festival';
+import { PhoneLink } from '@/components/shared/PhoneLink';
+import { buildCallLink, displayPhone } from '@/lib/phone';
 
 type Row = EventSponsorRow;
 
@@ -274,7 +276,7 @@ export default function MonthlySponsorsPage() {
                               {raasi != null && ` · ${astroLabel(RAASIS[raasi])}`}
                             </div>
                             <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-3">
-                              {s.phone && <a href={`tel:${s.phone}`} className="inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{s.phone}</a>}
+                              {s.phone && <PhoneLink href={buildCallLink(s.phone)} onEdit={() => { setEditing(s); setShowForm(true); }} className="inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{displayPhone(s.phone)}</PhoneLink>}
                               {s.sponsors?.full_name && <span>{s.relationship ? `${s.relationship} of ` : 'Related to '}{s.sponsors.full_name}</span>}
                               {s.payment_day && <span>Pays on day {s.payment_day}</span>}
                             </div>

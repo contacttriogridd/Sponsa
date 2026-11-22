@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 import type { AppUser, UserRole } from '@/lib/types';
+import { PhoneInput, phoneForSave } from '@/components/shared/PhoneInput';
 
 const ROLES: UserRole[] = ['admin', 'collector', 'staff', 'viewer'];
 
@@ -41,12 +42,14 @@ export default function UsersPage() {
 
   async function save() {
     if (!editing) return;
+    const phone = phoneForSave(form.phone);
+    if (phone.error) { alert(phone.error); return; }
     setBusy(true);
     await supabase.from('app_users').update({
       full_name: form.full_name || null,
       role: form.role,
       active: form.active,
-      phone: form.phone || null,
+      phone: phone.value,
     }).eq('id', editing.id);
     setBusy(false);
     setShowForm(false);
@@ -129,7 +132,7 @@ export default function UsersPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Phone</Label>
-                <Input value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+91 98765 43210" />
+                <PhoneInput value={form.phone} onChange={(v) => set('phone', v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Role</Label>

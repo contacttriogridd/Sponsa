@@ -23,6 +23,7 @@ import { COMMUNICATION_PREFERENCES } from '@/lib/constants';
 import { useAuth } from '@/lib/auth-context';
 import { CATEGORY_META, DONATION_CATEGORIES, PAYMENT_MODES, type DonationCategory } from '@/lib/donations';
 import { cn } from '@/lib/utils';
+import { PhoneInput, phoneForSave } from '@/components/shared/PhoneInput';
 
 /** The occasion type a category adds (Monthly and the one-time kinds have their own fields). */
 const CATEGORY_TYPE: Partial<Record<DonationCategory, string>> = {
@@ -157,7 +158,7 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
     if (form.sponsor_category !== 'Monthly') return true;
     const mode = form.payment_mode === 'Bank Transfer' ? 'Bank' : ['Cash', 'UPI'].includes(form.payment_mode) ? form.payment_mode : null;
     const row = {
-      name: form.full_name.trim(), phone: form.whatsapp.trim() || form.phone.trim() || null,
+      name: form.full_name.trim(), phone: phoneForSave(form.whatsapp).value || phoneForSave(form.phone).value,
       monthly_amount: Number(monthly.amount || form.sponsorship_amount) || null, payment_day: Number(monthly.day),
       start_date: `${monthly.start_month}-01`, end_date: monthly.end_month ? lastDayOf(monthly.end_month) : null,
       status: form.status === 'archived' ? 'stopped' : 'active', sponsor_id: sponsorId, relationship: 'Self',
@@ -177,9 +178,11 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
     const name = form.full_name.trim();
     if (!form.phone && !form.whatsapp && !form.email && !name) return [];
 
+    // Duplicates by the normalized number (+91XXXXXXXXXX), the form every number is stored in.
     const conditions: string[] = [];
-    if (form.phone) conditions.push(`phone.eq.${form.phone}`, `whatsapp.eq.${form.phone}`);
-    if (form.whatsapp) conditions.push(`phone.eq.${form.whatsapp}`, `whatsapp.eq.${form.whatsapp}`);
+    for (const n of [phoneForSave(form.phone).value, phoneForSave(form.whatsapp).value]) {
+      if (n) conditions.push(`phone.eq.${n}`, `whatsapp.eq.${n}`);
+    }
     if (form.email) conditions.push(`email.eq.${form.email}`);
     if (name) conditions.push(`full_name.ilike.%${name}%`);
     if (conditions.length === 0) return [];
@@ -199,7 +202,11 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
     const category = form.sponsor_category;
     if (!category) { setError('Choose a category.'); return; }
     if (!isEdit && !form.whatsapp.trim()) { setError('Mobile (WhatsApp) is required.'); return; }
-    if (form.whatsapp.trim() && form.whatsapp.replace(/\D/g, '').length < 10) { setError('Enter a valid mobile (WhatsApp) number.'); return; }
+    // Numbers are stored as +91XXXXXXXXXX; an invalid one blocks saving.
+    const wa = phoneForSave(form.whatsapp);
+    const alt = phoneForSave(form.phone);
+    if (wa.error) { setError(`Mobile (WhatsApp): ${wa.error}.`); return; }
+    if (alt.error) { setError(`Alternate mobile: ${alt.error}.`); return; }
     if (!isEdit && category !== 'Monthly' && !(Number(form.sponsorship_amount) > 0)) { setError('Sponsorship amount is required.'); return; }
     if (category === 'Monthly') {
       const day = Number(monthly.day);
@@ -233,8 +240,8 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
       full_name: form.full_name.trim(),
       preferred_name: form.preferred_name || null,
       dob: form.dob || null,
-      phone: form.phone || null,
-      whatsapp: form.whatsapp || null,
+      phone: alt.value,
+      whatsapp: wa.value,
       email: form.email || null,
       address: form.address || null,
       city: form.city || null,
@@ -488,11 +495,11 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label>Mobile (WhatsApp){!isEdit && <span className="text-destructive"> *</span>}</Label>
-            <Input type="tel" value={form.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} placeholder="+91 98765 43210" />
+            <PhoneInput value={form.whatsapp} onChange={(v) => set('whatsapp', v)} />
           </div>
           <div className="space-y-1.5">
             <Label>Alternate mobile</Label>
-            <Input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+91 98765 43210" />
+            <PhoneInput value={form.phone} onChange={(v) => set('phone', v)} />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label>Email</Label>

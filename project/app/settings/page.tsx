@@ -18,12 +18,12 @@ import { REMINDER_INTERVAL_OPTIONS } from '@/lib/constants';
 import { organizationNamesFrom } from '@/lib/organization';
 import { DEFAULT_STAR_REMINDER_DAYS } from '@/lib/monthly-sponsors';
 import { formatSentAt, messagingSettingsFrom, type MessagingSettings } from '@/lib/messaging';
-import { normalizeIndianNumber } from '@/lib/phone';
 import { clearWishContext } from '@/lib/star-wish';
 import { isWhatsAppConfigured } from '@/lib/whatsapp';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { OrganizationSettings } from '@/lib/types';
+import { PhoneInput, phoneForSave } from '@/components/shared/PhoneInput';
 
 export default function SettingsPage() {
   const { appUser } = useAuth();
@@ -78,14 +78,16 @@ export default function SettingsPage() {
   }
 
   async function save() {
-    const adminNumber = normalizeIndianNumber(messaging.adminNumber);
-    if (!adminNumber) { setError('Admin WhatsApp Number must be a 10-digit Indian mobile number.'); return; }
+    const adminNumber = phoneForSave(messaging.adminNumber).value;
+    if (!adminNumber) { setError('Admin WhatsApp Number: enter a valid 10-digit mobile number.'); return; }
+    const orgPhone = phoneForSave(form.phone);
+    if (orgPhone.error) { setError(`Organization phone: ${orgPhone.error}.`); return; }
     setBusy(true); setError('');
     const orgNames = { org_name_en: names.org_name_en.trim(), org_name_ta: names.org_name_ta.trim() };
     // `name` follows the English name so older code reading it stays in step.
     const starDays = Math.min(15, Math.max(0, Math.round(Number(starReminderDays) || 0)));
     let payload: Record<string, unknown> = {
-      ...form, ...orgNames, name: orgNames.org_name_en || form.name, reminder_intervals: intervals, star_reminder_days: starDays,
+      ...form, phone: orgPhone.value, ...orgNames, name: orgNames.org_name_en || form.name, reminder_intervals: intervals, star_reminder_days: starDays,
       admin_whatsapp_number: adminNumber,
       admin_name: messaging.adminName.trim() || 'Admin',
       notify_admin_default: messaging.notifyAdminDefault,
@@ -128,6 +130,7 @@ export default function SettingsPage() {
     { href: '/settings/templates', icon: FileText, label: 'Message Templates', desc: 'Thank-you note, birthday, anniversary and sponsorship templates' },
     { href: '/settings/occasion-types', icon: FileText, label: 'Occasion Types', desc: 'Birthday, anniversary, remembrance and other occasion choices' },
     { href: '/settings/calendar', icon: CalendarDays, label: 'Calendar', desc: 'Observance dates on the Star Calendar; import observances CSV' },
+    { href: '/settings/numbers', icon: Users, label: 'Numbers to fix', desc: 'Saved phone numbers that are not valid (admin)' },
     { href: '/settings/users', icon: Users, label: 'User Management', desc: 'Add and manage team members' },
   ];
 
@@ -166,7 +169,7 @@ export default function SettingsPage() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Phone</Label>
-              <Input value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+91 98765 43210" />
+              <PhoneInput value={form.phone} onChange={(v) => set('phone', v)} />
             </div>
             <div className="space-y-1.5">
               <Label>Email</Label>
@@ -228,7 +231,7 @@ export default function SettingsPage() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="admin-number">Admin WhatsApp Number</Label>
-              <Input id="admin-number" inputMode="tel" value={messaging.adminNumber} onChange={(e) => setMessaging((m) => ({ ...m, adminNumber: e.target.value }))} disabled={!isAdmin} placeholder="919629522777" />
+              <PhoneInput id="admin-number" value={messaging.adminNumber} onChange={(v) => setMessaging((m) => ({ ...m, adminNumber: v }))} disabled={!isAdmin} placeholder="96295 22777" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="admin-name">Admin Name</Label>

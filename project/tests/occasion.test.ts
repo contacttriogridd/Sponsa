@@ -108,7 +108,7 @@ test('form rules: required fields, phone normalised, defaults to the sponsor', (
   assert.match(validateDraft(d, family, sponsor)!, /valid 10-digit/);
   d.contact_phone = '96295 22777';
   const row = draftToRow(d, family, 's', sponsor);
-  assert.equal(row.contact_phone, '919629522777');
+  assert.equal(row.contact_phone, '+919629522777');
   assert.equal(row.occasion_type, 'Birthday');
   assert.equal(row.occasion_type_key, 'family_birthday');
   assert.equal(row.recurrence, 'yearly');

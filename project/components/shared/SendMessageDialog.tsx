@@ -11,7 +11,8 @@ import { useAuth } from '@/lib/auth-context';
 import { getTodayIST } from '@/lib/dateHelpers';
 import { logMessage, markAdminNotified, sendViaApi } from '@/lib/message-service';
 import { buildAdminNotification, messagingSettingsFrom, type MessagingSettings } from '@/lib/messaging';
-import { whatsappNumber } from '@/lib/phone';
+import { INVALID_PHONE_MESSAGE, displayPhone, phoneProblem, whatsappNumber } from '@/lib/phone';
+import { PhoneLink, warnInvalidPhone } from '@/components/shared/PhoneLink';
 import { loadWishContext } from '@/lib/star-wish';
 import { buildEmailUrl, buildSmsUrl, unfilledPlaceholders } from '@/lib/thank-you';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
@@ -46,12 +47,15 @@ export interface SendMessageDialogProps {
   children?: React.ReactNode | ((state: { edited: boolean }) => React.ReactNode);
   /** Why the message can't be sent yet (shown as a warning; sending is disabled). Gets the current text. */
   blockReason?: (text: string) => string | null;
+  /** Where to fix the contact's number when it is missing or invalid; defaults to the sponsor's page. */
+  editContactHref?: string | null;
+  onEditContact?: (() => void) | null;
 }
 
 /** The one Send Message modal: editable message, WhatsApp, and the optional details to the admin. */
 export function SendMessageDialog({
   open, onOpenChange, title = 'Send Message', sponsorId, sponsorName, phone, extraChannels, messageType, typeLabel,
-  initialText, relatedEventId, relatedDonationId, occurrenceDate, contactName, sendLabel = 'Send on WhatsApp', occasionId, occasionType, occasionTitle, onLogged, children, blockReason,
+  initialText, relatedEventId, relatedDonationId, occurrenceDate, contactName, sendLabel = 'Send on WhatsApp', occasionId, occasionType, occasionTitle, onLogged, children, blockReason, editContactHref, onEditContact,
 }: SendMessageDialogProps) {
   const { appUser } = useAuth();
   const [settings, setSettings] = useState<MessagingSettings>(messagingSettingsFrom(null));
@@ -74,7 +78,10 @@ export function SendMessageDialog({
 
   const employee = appUser?.full_name || appUser?.email || 'Staff';
   const by = { id: appUser?.id, name: employee };
+  // Checked again at send time: an invalid number never opens WhatsApp (no "Send to…" picker).
   const number = whatsappNumber(phone);
+  const problem = phoneProblem(phone);
+  const editContact = { editHref: editContactHref ?? (sponsorId ? `/sponsors/${sponsorId}` : null), onEdit: onEditContact ?? null };
   const occurrence = occurrenceDate || getTodayIST();
   const automatic = settings.sendMode === 'automatic';
   // A raw {{placeholder}} must never reach the sponsor.
@@ -114,6 +121,7 @@ export function SendMessageDialog({
   /** Automatic mode: sends sponsor and admin messages with no further clicks. */
   async function sendAutomatic() {
     setApiBusy(true); setApiError('');
+    if (!number) { warnInvalidPhone(editContact); setApiBusy(false); return; }
     const result = await sendViaApi(number, text);
     if (!result.success) {
       await logged('whatsapp_api', 'failed', { errorMessage: result.error });
@@ -162,12 +170,13 @@ export function SendMessageDialog({
       <MessageCircle className="h-4 w-4 mr-2" />{sendLabel}
     </Button>
   ) : (
-    <a href={buildWhatsAppUrl(number, text)} target="_blank" rel="noreferrer" onClick={onLinkClick}>
+    <PhoneLink href={buildWhatsAppUrl(number, text)} newTab onClick={onLinkClick} {...editContact}>
       <Button className="bg-green-600 hover:bg-green-700 text-white">
         <MessageCircle className="h-4 w-4 mr-2" />{sendLabel}
       </Button>
-    </a>
+    </PhoneLink>
   );
+  const adminLink = buildWhatsAppUrl(settings.adminNumber, sentLog ? adminMessage() : '');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -185,7 +194,7 @@ export function SendMessageDialog({
             <div className="font-medium">{sponsorName}</div>
             {occasionTitle && <div>{occasionTitle}</div>}
             {contactName && contactName !== sponsorName && <div className="text-muted-foreground">Contact: {contactName}</div>}
-            <div className="text-muted-foreground">{number ? `+${number}` : 'No phone number saved — WhatsApp will ask you to choose the chat.'}</div>
+            <div className="text-muted-foreground">{number ? displayPhone(phone) : problem === 'missing' ? 'No phone number saved.' : `${displayPhone(phone)} — invalid`}</div>
             <div className="text-muted-foreground">{typeLabel}</div>
           </div>
 
@@ -203,9 +212,21 @@ export function SendMessageDialog({
           <div className="flex items-start gap-2">
             <Checkbox id="notify-admin" checked={notifyAdmin} onCheckedChange={(v) => setNotifyAdmin(v === true)} className="mt-0.5" />
             <Label htmlFor="notify-admin" className="cursor-pointer font-normal">
-              Also send sponsor details to Admin ({settings.adminName} – {settings.adminNumber.replace(/^91/, '')})
+              Also send sponsor details to Admin ({settings.adminName} – {displayPhone(settings.adminNumber)})
             </Label>
           </div>
+
+          {problem && (
+            <div className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2 flex flex-wrap items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span className="flex-1">{problem === 'missing' ? "This contact has no phone number. Please add one." : INVALID_PHONE_MESSAGE} You can still copy the message.</span>
+              {(editContact.editHref || editContact.onEdit) && (
+                editContact.onEdit
+                  ? <Button size="sm" variant="outline" onClick={() => { onOpenChange(false); editContact.onEdit!(); }}>Edit contact</Button>
+                  : <a href={editContact.editHref!}><Button size="sm" variant="outline">Edit contact</Button></a>
+              )}
+            </div>
+          )}
 
           {blocked && (
             <p className="text-sm text-warning bg-warning/10 rounded-lg px-3 py-2 flex items-start gap-2">
@@ -217,7 +238,7 @@ export function SendMessageDialog({
 
           <div className="flex flex-wrap gap-2">
             {automatic && !apiError ? (
-              <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={cannotSend || apiBusy} onClick={sendAutomatic}>
+              <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={cannotSend || apiBusy || !number} onClick={sendAutomatic}>
                 <MessageCircle className="h-4 w-4 mr-2" />{apiBusy ? 'Sending...' : sendLabel}
               </Button>
             ) : whatsappLink}
@@ -225,9 +246,9 @@ export function SendMessageDialog({
               <>
                 <span title={smsPhone ? undefined : 'No phone number saved for this sponsor'}>
                   {smsPhone && !cannotSend ? (
-                    <a href={buildSmsUrl(smsPhone, text)} onClick={() => logged('sms', 'sent')}>
+                    <PhoneLink href={buildSmsUrl(smsPhone, text)} onClick={() => logged('sms', 'sent')} {...editContact}>
                       <Button variant="outline"><MessageSquare className="h-4 w-4 mr-1.5" />SMS</Button>
-                    </a>
+                    </PhoneLink>
                   ) : <Button variant="outline" disabled><MessageSquare className="h-4 w-4 mr-1.5" />SMS</Button>}
                 </span>
                 <span title={email ? undefined : 'No email address saved for this sponsor'}>
@@ -249,11 +270,11 @@ export function SendMessageDialog({
             <div className="rounded-lg border border-success/30 bg-success/10 p-3 space-y-2 text-sm">
               <div className="flex items-center gap-1.5 text-success font-medium"><CheckCircle2 className="h-4 w-4" />Sponsor message done</div>
               {notifyAdmin && !adminDone && !automatic && (
-                <a href={buildWhatsAppUrl(settings.adminNumber, adminMessage())} target="_blank" rel="noreferrer" onClick={onAdminLinkClick}>
+                <PhoneLink href={adminLink} newTab onClick={onAdminLinkClick} editHref="/settings">
                   <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
                     <MessageCircle className="h-4 w-4 mr-1.5" />Send details to Admin
                   </Button>
-                </a>
+                </PhoneLink>
               )}
               {adminDone && <div className="text-muted-foreground">Details sent to {settings.adminName}.</div>}
             </div>

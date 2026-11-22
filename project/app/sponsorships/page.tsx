@@ -18,6 +18,8 @@ import { DeleteRecordDialog, type DeletableRecord } from '@/components/shared/De
 import { openMonthlySponsorDrawer, useDrawerDataChanged } from '@/lib/drawer-store';
 import { useAuth } from '@/lib/auth-context';
 import type { MessageLog } from '@/lib/types';
+import { PhoneLink } from '@/components/shared/PhoneLink';
+import { buildCallLink } from '@/lib/phone';
 
 /** The request flow; older statuses are still shown and kept. */
 const FLOW = ['requested', 'confirmed', 'paid', 'declined', 'no_response'];
@@ -148,10 +150,14 @@ export default function SponsorshipsPage() {
                         </SelectContent>
                       </Select>
                       {phone && (
-                        <a href={`tel:${phone}`}><Button variant="outline" size="icon" aria-label="Call"><Phone className="h-4 w-4" /></Button></a>
+                        <PhoneLink href={buildCallLink(phone)} editHref={r.sponsor_id ? `/sponsors/${r.sponsor_id}` : null} onEdit={r.monthly_sponsors ? () => openMonthlySponsorDrawer(r.monthly_sponsors.id) : null}>
+                          <Button variant="outline" size="icon" aria-label="Call"><Phone className="h-4 w-4" /></Button>
+                        </PhoneLink>
                       )}
                       {phone && (
-                        <a href={buildWhatsAppUrl(phone)} target="_blank" rel="noreferrer"><Button variant="outline" size="icon" aria-label="WhatsApp"><MessageCircle className="h-4 w-4" /></Button></a>
+                        <PhoneLink href={buildWhatsAppUrl(phone)} newTab editHref={r.sponsor_id ? `/sponsors/${r.sponsor_id}` : null} onEdit={r.monthly_sponsors ? () => openMonthlySponsorDrawer(r.monthly_sponsors.id) : null}>
+                          <Button variant="outline" size="icon" aria-label="WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
+                        </PhoneLink>
                       )}
                       {r.sponsor_id && <Link href={`/sponsors/${r.sponsor_id}`}><Button variant="outline" size="sm">View</Button></Link>}
                       {appUser?.role === 'admin' && (

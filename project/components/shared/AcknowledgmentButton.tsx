@@ -11,6 +11,7 @@ import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { notifyDrawerDataChanged } from '@/lib/drawer-store';
 import { cn } from '@/lib/utils';
 import type { Donation } from '@/lib/types';
+import { PhoneLink } from '@/components/shared/PhoneLink';
 
 export interface AckContext { recipient: AckRecipient; sendMode: SendMode }
 
@@ -110,10 +111,10 @@ export function AcknowledgmentButton({ donation, sponsorName, onChanged }: { don
   return (
     <span className="inline-flex items-center" onClick={(e) => e.stopPropagation()}>
       {ctx && message && ctx.sendMode !== 'automatic' ? (
-        <a href={buildWhatsAppUrl(ctx.recipient.whatsapp, message)} target="_blank" rel="noreferrer"
+        <PhoneLink href={buildWhatsAppUrl(ctx.recipient.whatsapp, message)} newTab editHref="/settings"
           onClick={() => { setStatus('sent'); markAckOpened(donation, sponsorName, message).then(() => onChanged?.()); }}>
           {content}
-        </a>
+        </PhoneLink>
       ) : (
         <span onClick={() => ctx && message && sendAutomatic()}>{content}</span>
       )}

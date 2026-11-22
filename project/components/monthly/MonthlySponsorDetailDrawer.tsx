@@ -28,6 +28,8 @@ import { OBSERVANCE_META, type ObservanceView } from '@/lib/observances';
 import { loadObservances } from '@/lib/observances-store';
 import { PAKSHA_OPTIONS, entryAmount, hasPaksha, nextSponsorEvent, sponsorEventsOf } from '@/lib/event-wishes';
 import type { MonthlyPayment, MonthlySponsor, MonthlySponsorStatus, MonthlyWishLog } from '@/lib/types';
+import { PhoneLink } from '@/components/shared/PhoneLink';
+import { buildCallLink, displayPhone } from '@/lib/phone';
 
 type Row = MonthlySponsor & { sponsors?: { full_name: string } | null };
 
@@ -128,15 +130,15 @@ export function MonthlySponsorDetailDrawer({ monthlyId }: { monthlyId: string })
                 <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0"><Star className="h-6 w-6" /></div>
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold truncate">{sponsor.name}</h2>
-                  {sponsor.phone && <a href={`tel:${sponsor.phone}`} className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{sponsor.phone}</a>}
+                  {sponsor.phone && <PhoneLink href={buildCallLink(sponsor.phone)} onEdit={() => setEditing(true)} className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{displayPhone(sponsor.phone)}</PhoneLink>}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 mt-4">
-                {sponsor.phone && <a href={`tel:${sponsor.phone}`}><Button variant="outline" size="sm"><Phone className="h-4 w-4 mr-1.5" />Call</Button></a>}
+                {sponsor.phone && <PhoneLink href={buildCallLink(sponsor.phone)} onEdit={() => setEditing(true)}><Button variant="outline" size="sm"><Phone className="h-4 w-4 mr-1.5" />Call</Button></PhoneLink>}
                 {sponsor.phone && (
-                  <a href={buildWhatsAppUrl(whatsappNumber(sponsor.phone))} target="_blank" rel="noreferrer">
+                  <PhoneLink href={buildWhatsAppUrl(sponsor.phone)} newTab onEdit={() => setEditing(true)}>
                     <Button variant="outline" size="sm" className="text-green-600 border-green-200 hover:bg-green-50"><MessageCircle className="h-4 w-4 mr-1.5" />WhatsApp</Button>
-                  </a>
+                  </PhoneLink>
                 )}
                 <Button variant="outline" size="sm" onClick={() => setEditing(true)}><Edit className="h-4 w-4 mr-1.5" />Edit</Button>
               </div>

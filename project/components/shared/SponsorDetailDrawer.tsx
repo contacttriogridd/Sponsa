@@ -29,6 +29,8 @@ import { whatsappNumber } from '@/lib/star-wish';
 import { closeDrawer, notifyDrawerDataChanged, openMonthlySponsorDrawer } from '@/lib/drawer-store';
 import { cn } from '@/lib/utils';
 import type { Donation, Interaction, MonthlySponsor, SpecialOccasion, Sponsor, SponsorshipRequest, Task } from '@/lib/types';
+import { PhoneLink } from '@/components/shared/PhoneLink';
+import { buildCallLink, displayPhone } from '@/lib/phone';
 
 interface ReminderRow {
   id: string;
@@ -224,15 +226,15 @@ export function SponsorDetailDrawer({ sponsorId, occasionId, open }: { sponsorId
                 <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary text-lg font-semibold shrink-0">{initials}</div>
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold truncate">{s.full_name}</h2>
-                  {s.phone && <a href={`tel:${s.phone}`} className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{s.phone}</a>}
+                  {s.phone && <PhoneLink href={buildCallLink(s.phone)} onEdit={() => setDialog('edit')} className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{displayPhone(s.phone)}</PhoneLink>}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 mt-4">
-                {s.phone && <a href={`tel:${s.phone}`}><Button variant="outline" size="sm"><Phone className="h-4 w-4 mr-1.5" />Call</Button></a>}
+                {s.phone && <PhoneLink href={buildCallLink(s.phone)} onEdit={() => setDialog('edit')}><Button variant="outline" size="sm"><Phone className="h-4 w-4 mr-1.5" />Call</Button></PhoneLink>}
                 {(s.whatsapp || s.phone) && (
-                  <a href={buildWhatsAppUrl(whatsappNumber(s.whatsapp || s.phone))} target="_blank" rel="noreferrer">
+                  <PhoneLink href={buildWhatsAppUrl(s.whatsapp || s.phone)} newTab onEdit={() => setDialog('edit')}>
                     <Button variant="outline" size="sm" className="text-green-600 border-green-200 hover:bg-green-50"><MessageCircle className="h-4 w-4 mr-1.5" />WhatsApp</Button>
-                  </a>
+                  </PhoneLink>
                 )}
                 <Button variant="outline" size="sm" onClick={() => setDialog('edit')}><Edit className="h-4 w-4 mr-1.5" />Edit</Button>
                 <Link href={`/sponsors/${s.id}`} onClick={() => closeDrawer()}>
@@ -268,8 +270,8 @@ export function SponsorDetailDrawer({ sponsorId, occasionId, open }: { sponsorId
               <Section title="Details">
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
                   <Detail label="Name">{s.full_name}{s.preferred_name && s.preferred_name !== s.full_name ? ` (${s.preferred_name})` : ''}</Detail>
-                  <Detail label="Phone">{s.phone ? <a href={`tel:${s.phone}`} className="text-primary hover:underline">{s.phone}</a> : '—'}</Detail>
-                  <Detail label="Alternate phone">{alternate ? <a href={`tel:${alternate}`} className="text-primary hover:underline">{alternate}</a> : '—'}</Detail>
+                  <Detail label="Phone">{s.phone ? <PhoneLink href={buildCallLink(s.phone)} onEdit={() => setDialog('edit')} className="text-primary hover:underline">{displayPhone(s.phone)}</PhoneLink> : '—'}</Detail>
+                  <Detail label="Alternate phone">{alternate ? <PhoneLink href={buildCallLink(alternate)} onEdit={() => setDialog('edit')} className="text-primary hover:underline">{displayPhone(alternate)}</PhoneLink> : '—'}</Detail>
                   <Detail label="Email">{s.email ? <a href={`mailto:${s.email}`} className="text-primary hover:underline inline-flex items-center gap-1"><Mail className="h-3.5 w-3.5" />{s.email}</a> : '—'}</Detail>
                   <Detail label="Address">{s.address ? <span className="inline-flex gap-1"><MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />{s.address}</span> : '—'}</Detail>
                   <Detail label="Area / City">{[s.city, s.district].filter(Boolean).join(', ') || '—'}</Detail>

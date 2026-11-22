@@ -10,19 +10,11 @@ import { RAASIS, STARS } from '@/lib/natchathiram';
 import { monthKey, shiftMonth, todayIst } from '@/lib/monthly-sponsors';
 import type { Donation, MonthlyPayment, MonthlySponsor } from '@/lib/types';
 import { donationMonth, sumDonations } from '@/lib/donations';
+import { downloadCsv } from '@/lib/export-download';
+import { ddmmyyyy, exportPhone, plainAmount } from '@/lib/export';
 
 interface MonthTotal { month: string; collected: number; pending: number }
 
-/** CSV with a UTF-8 byte-order mark so Excel shows Tamil names correctly. */
-function downloadUtf8Csv(rows: Record<string, unknown>[], filename: string) {
-  if (!rows.length) return;
-  const headers = Object.keys(rows[0]);
-  const csv = [headers.join(','), ...rows.map((r) => headers.map((h) => JSON.stringify(r[h] ?? '')).join(','))].join('\n');
-  const url = URL.createObjectURL(new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8' }));
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
-}
 
 const monthLabel = (m: string) => new Date(`${m}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 
@@ -65,19 +57,25 @@ export function MonthlySponsorsReport() {
       .from('monthly_payments')
       .select('*, monthly_sponsors(name)')
       .order('month', { ascending: false });
-    downloadUtf8Csv((data || []).map((p: any) => ({
-      month: p.month, sponsor: p.monthly_sponsors?.name, amount: p.amount, status: p.status, paid_on: p.paid_on, mode: p.mode, notes: p.notes,
-    })), 'monthly-payments.csv');
+    downloadCsv([
+      ['Month', 'Sponsor', 'Amount (₹)', 'Status', 'Paid On', 'Mode', 'Notes'],
+      ...(data || []).map((p: any) => [monthLabel(p.month), p.monthly_sponsors?.name, p.amount != null ? plainAmount(p.amount) : '', p.status, ddmmyyyy(p.paid_on), p.mode, p.notes]),
+    ], 'monthly-payments.csv');
   }
 
+
   async function exportSponsors() {
-    downloadUtf8Csv((sponsors || []).map((s) => ({
-      name: s.name, phone: s.phone, dob: s.dob,
-      raasi: s.raasi != null ? `${RAASIS[s.raasi].ta} (${RAASIS[s.raasi].en})` : '',
-      star: s.star != null ? `${STARS[s.star].ta} (${STARS[s.star].en})` : '',
-      monthly_amount: s.monthly_amount, payment_day: s.payment_day, start_date: s.start_date, status: s.status, notes: s.notes,
-    })), 'monthly-sponsors.csv');
+    downloadCsv([
+      ['Name', 'Phone', 'Date of Birth', 'Raasi', 'Star', 'Monthly Amount (₹)', 'Payment Day', 'Start Date', 'Status', 'Notes'],
+      ...(sponsors || []).filter((s) => !s.deleted_at).map((s) => [
+        s.name, exportPhone(s.phone), ddmmyyyy(s.dob),
+        s.raasi != null ? `${RAASIS[s.raasi].ta} (${RAASIS[s.raasi].en})` : '',
+        s.star != null ? `${STARS[s.star].ta} (${STARS[s.star].en})` : '',
+        s.monthly_amount != null ? plainAmount(s.monthly_amount) : '', s.payment_day ?? '', ddmmyyyy(s.start_date), s.status, s.notes,
+      ]),
+    ], 'monthly-sponsors.csv');
   }
+
 
   if (!sponsors) return null;
   const active = sponsors.filter((s) => s.status === 'active');

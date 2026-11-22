@@ -17,6 +17,8 @@ import { addDays } from '@/lib/star-days';
 import { loadStarCalendar } from '@/lib/star-calendar-store';
 import { openMonthlySponsorDrawer } from '@/lib/drawer-store';
 import type { MonthlyFamilyMember, MonthlyPayment, MonthlySponsor } from '@/lib/types';
+import { PhoneLink } from '@/components/shared/PhoneLink';
+import { buildCallLink } from '@/lib/phone';
 
 /**
  * Reminders page section: star days within the reminder window (default
@@ -64,7 +66,7 @@ export function MonthlySponsorReminders() {
               <p className="text-sm text-muted-foreground">Star from {formatIstTime(u.occurrence.start)} to {formatIstTime(u.occurrence.end)}</p>
             </div>
             <div className="hidden sm:flex gap-2">
-              {u.sponsor.phone && <a href={`tel:${u.sponsor.phone}`}><Button variant="outline" size="icon"><Phone className="h-4 w-4" /></Button></a>}
+              {u.sponsor.phone && <PhoneLink href={buildCallLink(u.sponsor.phone)}><Button variant="outline" size="icon" aria-label="Call"><Phone className="h-4 w-4" /></Button></PhoneLink>}
               <SendWishButton sponsor={u.sponsor} starDate={u.occurrence.date} size="default" />
             </div>
           </div>
@@ -84,7 +86,7 @@ export function MonthlySponsorReminders() {
               </p>
             </div>
             {d.sponsor.phone && (
-              <a href={`tel:${d.sponsor.phone}`} className="hidden sm:block"><Button variant="outline" size="icon"><Phone className="h-4 w-4" /></Button></a>
+              <PhoneLink href={buildCallLink(d.sponsor.phone)} className="hidden sm:block"><Button variant="outline" size="icon" aria-label="Call"><Phone className="h-4 w-4" /></Button></PhoneLink>
             )}
           </div>
         </Card>

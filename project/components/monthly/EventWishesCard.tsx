@@ -20,6 +20,8 @@ import { buildEventWishMessage, eventDays, eventWishesOn, type EventWish } from 
 import { loadEventWishContext, loadEventWishSent, logEventWish, sentKey, type EventWishContext } from '@/lib/event-wishes-store';
 import { cn } from '@/lib/utils';
 import type { MonthlyPayment, MonthlySponsor } from '@/lib/types';
+import { PhoneLink } from '@/components/shared/PhoneLink';
+import { buildCallLink, displayPhone } from '@/lib/phone';
 
 export type EventSponsorRow = MonthlySponsor & { sponsors?: { full_name: string; whatsapp?: string | null; phone?: string | null } | null };
 
@@ -99,7 +101,9 @@ export function EventWishesCard({ sponsors, events, today, starToday, starTomorr
     record(w, date, 'copy', message);
   }
 
+  // Invalid or missing numbers are skipped in Send to all and listed in the summary.
   const sendable = todayWishes.filter((w) => whatsappNumber(phoneOf(w.sponsor)));
+  const skipped = todayWishes.filter((w) => !whatsappNumber(phoneOf(w.sponsor)));
   const step = stepping != null ? sendable[stepping] : null;
 
   return (
@@ -141,13 +145,13 @@ export function EventWishesCard({ sponsors, events, today, starToday, starTomorr
                       {done && <Badge variant="outline" className="text-success border-success/40"><CheckCircle2 className="h-3 w-3 mr-1" />Sent</Badge>}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-3">
-                      {phone ? <a href={`tel:${phone}`} className="inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{phone}</a> : <span>No phone number</span>}
+                      {phone ? <PhoneLink href={buildCallLink(phone)} onEdit={() => openMonthlySponsorDrawer(w.sponsor.id)} className="inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{displayPhone(phone)}</PhoneLink> : <span>No phone number</span>}
                       <span className="font-medium text-foreground">{w.amount != null ? formatCurrency(w.amount) : '—'}</span>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {number && ctx ? (
-                      <a href={buildWhatsAppUrl(number, message)} target="_blank" rel="noreferrer" onClick={() => record(w, today, 'whatsapp', message)}>
+                      <a href={buildWhatsAppUrl(number, message) || undefined} target="_blank" rel="noreferrer" onClick={() => record(w, today, 'whatsapp', message)}>
                         <Button size="sm" variant="outline" className="text-green-600 border-green-200 hover:bg-green-50"><MessageCircle className="h-4 w-4 mr-1.5" />Send Wish</Button>
                       </a>
                     ) : (
@@ -220,7 +224,7 @@ export function EventWishesCard({ sponsors, events, today, starToday, starTomorr
                 </div>
                 <div className="rounded-md border bg-muted/50 p-3 text-sm whitespace-pre-wrap max-h-64 overflow-y-auto">{message}</div>
                 <div className="flex flex-wrap gap-2">
-                  <a href={buildWhatsAppUrl(number, message)} target="_blank" rel="noreferrer" onClick={() => { record(step, today, 'whatsapp', message); next(); }}>
+                  <a href={buildWhatsAppUrl(number, message) || undefined} target="_blank" rel="noreferrer" onClick={() => { record(step, today, 'whatsapp', message); next(); }}>
                     <Button className="bg-green-600 hover:bg-green-700 text-white"><MessageCircle className="h-4 w-4 mr-1.5" />Open WhatsApp &amp; next</Button>
                   </a>
                   <Button variant="outline" onClick={next}>Skip<ChevronRight className="h-4 w-4 ml-1" /></Button>
@@ -230,7 +234,17 @@ export function EventWishesCard({ sponsors, events, today, starToday, starTomorr
             );
           })() : (
             <div className="space-y-3 text-sm">
-              <p>All {sendable.length} sponsors done. {sendable.filter((w) => isSent(w, today)).length} marked ✓ Sent.</p>
+              <p>Sent: {sendable.filter((w) => isSent(w, today)).length} · Skipped (invalid number): {skipped.length}</p>
+              {skipped.length > 0 && (
+                <ul className="space-y-1">
+                  {skipped.map((w) => (
+                    <li key={w.sponsor.id} className="flex items-center justify-between gap-2 rounded border border-border px-2 py-1">
+                      <span>{w.sponsor.name} <span className="text-muted-foreground">{phoneOf(w.sponsor) || 'no number'}</span></span>
+                      <Button size="sm" variant="ghost" onClick={() => { setStepping(null); openMonthlySponsorDrawer(w.sponsor.id); }}>Edit</Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <Button variant="outline" onClick={() => setStepping(null)}>Close</Button>
             </div>
           )}

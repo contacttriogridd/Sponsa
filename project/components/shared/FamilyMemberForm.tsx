@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/lib/supabase/client';
 import type { FamilyMember } from '@/lib/types';
 import { RELATIONSHIPS } from '@/lib/constants';
+import { PhoneInput, phoneForSave } from '@/components/shared/PhoneInput';
 
 interface FamilyMemberFormProps {
   sponsorId: string;
@@ -38,13 +39,16 @@ export function FamilyMemberForm({ sponsorId, member, onSaved, onCancel }: Famil
     if (!form.full_name.trim()) { setError('Name is required.'); return; }
     setBusy(true); setError('');
 
+    const phone = phoneForSave(form.phone);
+    const whatsapp = phoneForSave(form.whatsapp);
+    if (phone.error || whatsapp.error) { setBusy(false); setError('Enter a valid 10-digit mobile number.'); return; }
     const payload = {
       sponsor_id: sponsorId,
       full_name: form.full_name.trim(),
       relationship: form.relationship,
       dob: form.dob || null,
-      phone: form.phone || null,
-      whatsapp: form.whatsapp || null,
+      phone: phone.value,
+      whatsapp: whatsapp.value,
       notes: form.notes || null,
     };
 
@@ -107,11 +111,11 @@ export function FamilyMemberForm({ sponsorId, member, onSaved, onCancel }: Famil
         </div>
         <div className="space-y-1.5">
           <Label>Phone</Label>
-          <Input value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+91 98765 43210" />
+          <PhoneInput value={form.phone} onChange={(v) => set('phone', v)} />
         </div>
         <div className="space-y-1.5">
           <Label>WhatsApp</Label>
-          <Input value={form.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} placeholder="+91 98765 43210" />
+          <PhoneInput value={form.whatsapp} onChange={(v) => set('whatsapp', v)} />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Notes</Label>

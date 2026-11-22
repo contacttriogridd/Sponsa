@@ -16,6 +16,8 @@ import { useAuth } from '@/lib/auth-context';
 import { RepeatFields, repeatPayload, type RepeatValue } from './RepeatFields';
 import { renderTemplate } from '@/lib/templates';
 import { useOrganizationNames } from '@/lib/use-organization-names';
+import { PhoneLink } from '@/components/shared/PhoneLink';
+import { buildCallLink } from '@/lib/phone';
 
 // How each request type is described in the suggested WhatsApp message.
 const REQUEST_PHRASES: Record<string, string> = {
@@ -271,26 +273,21 @@ Warm regards,
           <Save className="h-4 w-4 mr-2" />
           {busy ? 'Saving...' : isEdit ? 'Save Changes' : 'Save Request'}
         </Button>
-        {sponsor.whatsapp && (
-          <a
-            href={buildWhatsAppUrl(sponsor.whatsapp, form.message)}
-            target="_blank"
-            rel="noreferrer"
-            onClick={markContacted}
-          >
+        {(sponsor.whatsapp || sponsor.phone) && (
+          <PhoneLink href={buildWhatsAppUrl(sponsor.whatsapp || sponsor.phone, form.message)} newTab onClick={markContacted} editHref={`/sponsors/${sponsor.id}`}>
             <Button variant="outline" className="text-green-600 border-green-200 hover:bg-green-50">
               <MessageCircle className="h-4 w-4 mr-2" />
               Send WhatsApp
             </Button>
-          </a>
+          </PhoneLink>
         )}
         {sponsor.phone && (
-          <a href={`tel:${sponsor.phone}`}>
+          <PhoneLink href={buildCallLink(sponsor.phone)} editHref={`/sponsors/${sponsor.id}`}>
             <Button variant="outline">
               <Phone className="h-4 w-4 mr-2" />
               Call
             </Button>
-          </a>
+          </PhoneLink>
         )}
         <Button variant="outline" onClick={onCancel}><X className="h-4 w-4 mr-2" />Cancel</Button>
       </div>

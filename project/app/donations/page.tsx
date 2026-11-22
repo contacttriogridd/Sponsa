@@ -24,6 +24,7 @@ import { CATEGORY_META, categoryOf, sumDonations, totalsByCategory, type Donatio
 import { todayIst } from '@/lib/monthly-sponsors';
 import { addDays } from '@/lib/star-days';
 import type { Donation, MessageLog, Sponsor } from '@/lib/types';
+import { MonthlyReportDownload } from '@/components/shared/MonthlyReportDownload';
 
 type Row = Donation & {
   sponsors?: { id: string; full_name: string; preferred_name: string | null; phone: string | null; whatsapp: string | null; email: string | null } | null;
@@ -117,6 +118,11 @@ export default function DonationsPage() {
             <div className="text-xs text-muted-foreground mt-1">People Helped</div>
           </Card>
         </div>
+
+        <Card className="p-3">
+          <div className="text-sm font-medium mb-2">Monthly Donation Report</div>
+          <MonthlyReportDownload compact />
+        </Card>
 
         <Card className="p-3 space-y-3">
           <div className="flex flex-col md:flex-row gap-3">

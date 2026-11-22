@@ -19,6 +19,8 @@ import { cn } from '@/lib/utils';
 import { RecordDonationButton } from '@/components/shared/RecordDonationDialog';
 import { totalsBySponsor, type DonationCategory } from '@/lib/donations';
 import { useDrawerDataChanged } from '@/lib/drawer-store';
+import { PhoneLink } from '@/components/shared/PhoneLink';
+import { buildCallLink, buildWhatsAppLink } from '@/lib/phone';
 
 /** The donation category a sponsors tab records into. */
 const TAB_CATEGORY: Record<EventTab, DonationCategory> = {
@@ -162,8 +164,8 @@ export default function SponsorsPage() {
                     )}
                   </div>
                   <div className="hidden sm:flex gap-1">
-                    {s.phone && <a href={`tel:${s.phone}`}><Button variant="outline" size="icon"><Phone className="h-4 w-4" /></Button></a>}
-                    {s.whatsapp && <a href={`https://wa.me/${s.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"><Button variant="outline" size="icon"><MessageCircle className="h-4 w-4" /></Button></a>}
+                    {s.phone && <PhoneLink href={buildCallLink(s.phone)} editHref={`/sponsors/${s.id}`}><Button variant="outline" size="icon" aria-label="Call"><Phone className="h-4 w-4" /></Button></PhoneLink>}
+                    {(s.whatsapp || s.phone) && <PhoneLink href={buildWhatsAppLink(s.whatsapp || s.phone)} newTab editHref={`/sponsors/${s.id}`}><Button variant="outline" size="icon" aria-label="WhatsApp"><MessageCircle className="h-4 w-4" /></Button></PhoneLink>}
                     {s.email && <a href={`mailto:${s.email}`}><Button variant="outline" size="icon"><Mail className="h-4 w-4" /></Button></a>}
                   </div>
                   <div className="hidden md:block w-28 text-right">

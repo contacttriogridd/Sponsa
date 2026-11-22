@@ -26,6 +26,8 @@ import { OBSERVANCE_CHIP } from '@/components/monthly/ObservanceChip';
 import { eventWishesOn } from '@/lib/event-wishes';
 import { formatCurrency } from '@/lib/constants';
 import type { MonthlyFamilyMember, MonthlySponsor } from '@/lib/types';
+import { PhoneLink } from '@/components/shared/PhoneLink';
+import { buildCallLink, displayPhone } from '@/lib/phone';
 
 const WEEKDAYS = [
   { ta: 'ஞாயிறு', en: 'Sun' }, { ta: 'திங்கள்', en: 'Mon' }, { ta: 'செவ்வாய்', en: 'Tue' }, { ta: 'புதன்', en: 'Wed' },
@@ -330,7 +332,7 @@ export default function StarCalendarPage() {
                       </div>
                     )}
                     {u.sponsor.phone && (
-                      <a href={`tel:${u.sponsor.phone}`} className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{u.sponsor.phone}</a>
+                      <PhoneLink href={buildCallLink(u.sponsor.phone)} onEdit={() => { setSelected(null); openMonthlySponsorDrawer(parentIdOf(u.sponsor)); }} className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{displayPhone(u.sponsor.phone)}</PhoneLink>
                     )}
                   </div>
                   <SendWishButton sponsor={u.sponsor} starDate={u.occurrence.date} />
@@ -351,7 +353,7 @@ export default function StarCalendarPage() {
                         ))}
                       </div>
                       {w.sponsor.phone && (
-                        <a href={`tel:${w.sponsor.phone}`} className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{w.sponsor.phone}</a>
+                        <PhoneLink href={buildCallLink(w.sponsor.phone)} onEdit={() => { setSelected(null); openMonthlySponsorDrawer(w.sponsor.id); }} className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{displayPhone(w.sponsor.phone)}</PhoneLink>
                       )}
                     </div>
                     {w.amount != null && <span className="text-sm font-medium">{formatCurrency(w.amount)}</span>}
@@ -391,7 +393,7 @@ function UpcomingCard({ item }: { item: UpcomingStarDay }) {
         </div>
         <div className="flex gap-2">
           {sponsor.phone && (
-            <a href={`tel:${sponsor.phone}`}><Button variant="outline" size="icon" aria-label={`Call ${sponsor.name}`}><Phone className="h-4 w-4" /></Button></a>
+            <PhoneLink href={buildCallLink(sponsor.phone)} onEdit={() => openMonthlySponsorDrawer(parentIdOf(sponsor))}><Button variant="outline" size="icon" aria-label={`Call ${sponsor.name}`}><Phone className="h-4 w-4" /></Button></PhoneLink>
           )}
           <SendWishButton sponsor={sponsor} starDate={occurrence.date} />
         </div>

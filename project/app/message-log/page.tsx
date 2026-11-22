@@ -16,6 +16,8 @@ import { CHANNEL_LABELS, MESSAGE_TYPE_LABELS, formatDateLabel, formatSentAt } fr
 import { confirmMessage } from '@/lib/message-service';
 import { useAuth } from '@/lib/auth-context';
 import type { MessageLog, MessageType } from '@/lib/types';
+import { downloadCsv } from '@/lib/export-download';
+import { ddmmyyyy, exportPhone } from '@/lib/export';
 
 const ALL = 'all';
 
@@ -51,17 +53,16 @@ export default function MessageLogPage() {
   });
 
   function exportCsv() {
-    const headers = ['sent_at', 'date_for', 'type', 'sponsor', 'sponsor_phone', 'recipient', 'recipient_phone', 'channel', 'status', 'sent_by', 'admin_notified', 'message'];
-    const rows = filtered.map((l) => [
-      formatSentAt(l.sent_at), l.occurrence_date, l.type_label || MESSAGE_TYPE_LABELS[l.message_type], l.sponsor_name, l.sponsor_phone,
-      l.recipient, l.recipient_phone, CHANNEL_LABELS[l.channel], l.status, l.sent_by_name, l.admin_notified ? 'yes' : 'no', l.message_text,
-    ].map((v) => JSON.stringify(v ?? '')).join(','));
-    // Byte-order mark so Excel shows Tamil correctly.
-    const url = URL.createObjectURL(new Blob(['﻿', [headers.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url; a.download = 'message-log.csv'; a.click();
-    URL.revokeObjectURL(url);
+    // Excel-safe: BOM, quoted fields ("" inside), CRLF line ends, DD-MM-YYYY, phones as +91 text.
+    downloadCsv([
+      ['Sent At', 'Date For', 'Type', 'Sponsor', 'Sponsor Phone', 'Recipient', 'Recipient Phone', 'Channel', 'Status', 'Sent By', 'Admin Notified', 'Message'],
+      ...filtered.map((l) => [
+        formatSentAt(l.sent_at), ddmmyyyy(l.occurrence_date), l.type_label || MESSAGE_TYPE_LABELS[l.message_type], l.sponsor_name, exportPhone(l.sponsor_phone),
+        l.recipient, exportPhone(l.recipient_phone), CHANNEL_LABELS[l.channel], l.status, l.sent_by_name, l.admin_notified ? 'Yes' : 'No', l.message_text,
+      ]),
+    ], 'message-log.csv');
   }
+
 
   const canWrite = appUser?.role === 'admin' || appUser?.role === 'collector';
 

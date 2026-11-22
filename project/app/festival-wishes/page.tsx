@@ -1,5 +1,8 @@
 'use client';
 
+import Link from 'next/link';
+import { openMonthlySponsorDrawer } from '@/lib/drawer-store';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MessageCircle, RotateCcw, Save, Search } from 'lucide-react';
 import { toast } from 'sonner';
@@ -28,6 +31,8 @@ import { whatsappNumber } from '@/lib/phone';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { useDrawerDataChanged } from '@/lib/drawer-store';
 import type { MessageLog } from '@/lib/types';
+import { PhoneLink } from '@/components/shared/PhoneLink';
+import { displayPhone } from '@/lib/phone';
 
 interface Recipient {
   id: string;
@@ -56,6 +61,9 @@ export default function FestivalWishesPage() {
   const [queue, setQueue] = useState<Recipient[]>([]);
   const [position, setPosition] = useState(0);
   const [autoBusy, setAutoBusy] = useState(false);
+  // Bulk send: invalid / missing numbers are skipped and listed at the end.
+  const [skippedPeople, setSkippedPeople] = useState<Recipient[]>([]);
+  const [batchSent, setBatchSent] = useState(0);
 
   const year = festivalYear();
   const festival = festivals.find((f) => f.id === festivalId);
@@ -144,7 +152,9 @@ export default function FestivalWishesPage() {
     begin();
   }
   function begin() {
-    setQueue(chosenPeople);
+    setQueue(chosenPeople.filter((p) => whatsappNumber(p.phone)));
+    setSkippedPeople(chosenPeople.filter((p) => !whatsappNumber(p.phone)));
+    setBatchSent(0);
     setPosition(0);
   }
 
@@ -166,7 +176,7 @@ export default function FestivalWishesPage() {
       const p = queue[i];
       const text = messageFor(p);
       const result = await sendViaApi(whatsappNumber(p.phone), text);
-      if (!result.success) failed += 1;
+      if (!result.success) failed += 1; else setBatchSent((n) => n + 1);
       await logMessage({ ...logBase(p, text), channel: 'whatsapp_api', status: result.success ? 'sent' : 'failed', errorMessage: result.error, providerMessageId: result.messageId });
     }
     setAutoBusy(false);
@@ -290,6 +300,15 @@ export default function FestivalWishesPage() {
         )}
       </div>
 
+      {queue.length === 0 && skippedPeople.length > 0 && (
+        <Card className="p-4 space-y-2 text-sm">
+          <div className="flex items-center justify-between gap-2">
+            <span>Sent: 0 · Skipped (invalid number): {skippedPeople.length}</span>
+            <Button size="sm" variant="outline" onClick={() => setSkippedPeople([])}>Close</Button>
+          </div>
+          <SkippedList people={skippedPeople} />
+        </Card>
+      )}
       {queue.length > 0 && (
         <div className="fixed inset-x-0 bottom-16 lg:bottom-0 z-40 p-4 flex justify-center pointer-events-none">
           <Card className="w-full max-w-lg p-4 shadow-xl pointer-events-auto space-y-3">
@@ -302,32 +321,35 @@ export default function FestivalWishesPage() {
                 <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                   <div className="h-full bg-primary transition-all" style={{ width: `${(position / queue.length) * 100}%` }} />
                 </div>
-                <div className="text-sm"><span className="font-medium">{current.name}</span> · {current.phone || 'No phone — WhatsApp will ask for the chat'}</div>
+                <div className="text-sm"><span className="font-medium">{current.name}</span> · {displayPhone(current.phone) || 'No phone number'}</div>
                 {automatic ? (
                   <Button className="w-full" disabled={autoBusy} onClick={sendAllAutomatic}>{autoBusy ? 'Sending…' : `Send all ${queue.length} automatically`}</Button>
                 ) : (
                   <div className="flex gap-2">
-                    <a
+                    <PhoneLink
                       className="flex-1"
-                      href={buildWhatsAppUrl(whatsappNumber(current.phone), messageFor(current))}
-                      target="_blank"
-                      rel="noreferrer"
+                      href={buildWhatsAppUrl(current.phone, messageFor(current))}
+                      newTab
                       onClick={() => {
                         const p = current;
                         logMessage({ ...logBase(p, messageFor(p)), channel: 'whatsapp_link', status: 'opened' }).then(() => loadLogs(festival?.key));
+                        setBatchSent((n) => n + 1);
                         setTimeout(() => setPosition((i) => i + 1), 300);
                       }}
                     >
                       <Button className="w-full bg-green-600 hover:bg-green-700 text-white"><MessageCircle className="h-4 w-4 mr-2" />Open WhatsApp</Button>
-                    </a>
+                    </PhoneLink>
                     <Button variant="outline" onClick={() => setPosition((i) => i + 1)}>Skip</Button>
                   </div>
                 )}
               </>
             ) : (
-              <div className="flex items-center justify-between text-sm">
-                <span>Done — {queue.length} processed. Confirm each send when asked.</span>
-                <Button size="sm" variant="outline" onClick={() => setQueue([])}>Close</Button>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span>Sent: {batchSent} · Skipped (invalid number): {skippedPeople.length}{automatic ? '' : '. Confirm each send when asked.'}</span>
+                  <Button size="sm" variant="outline" onClick={() => { setQueue([]); setSkippedPeople([]); }}>Close</Button>
+                </div>
+                <SkippedList people={skippedPeople} />
               </div>
             )}
           </Card>
@@ -343,5 +365,22 @@ export default function FestivalWishesPage() {
         onConfirm={() => { setConfirmResend(false); begin(); }}
       />
     </AppLayout>
+  );
+}
+
+/** Recipients skipped for an invalid or missing number, each with an Edit link. */
+function SkippedList({ people }: { people: Recipient[] }) {
+  if (!people.length) return null;
+  return (
+    <ul className="space-y-1">
+      {people.map((p) => (
+        <li key={`${p.category}-${p.id}`} className="flex items-center justify-between gap-2 rounded border border-border px-2 py-1">
+          <span>{p.name} <span className="text-muted-foreground">{p.phone || 'no number'}</span></span>
+          {p.category === 'monthly'
+            ? <Button size="sm" variant="ghost" onClick={() => openMonthlySponsorDrawer(p.id)}>Edit</Button>
+            : <Link href={`/sponsors/${p.id}`}><Button size="sm" variant="ghost">Edit</Button></Link>}
+        </li>
+      ))}
+    </ul>
   );
 }

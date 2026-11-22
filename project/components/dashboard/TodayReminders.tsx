@@ -20,6 +20,8 @@ import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import type { ReminderItem } from '@/lib/today-reminders';
 import type { Donation, SpecialOccasion, Sponsor } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { PhoneLink } from '@/components/shared/PhoneLink';
+import { buildCallLink, displayPhone } from '@/lib/phone';
 
 const NOTIFIED_KEY = 'vp_today_notified';
 
@@ -124,7 +126,7 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
                   {item.donationType && <div className="text-sm text-muted-foreground">Donation: {normalizeDonationType(item.donationType)}</div>}
                   <div className="text-sm text-muted-foreground mt-0.5">
                     Contact: {item.contactName || item.name}
-                    {item.phone && <> · <a href={`tel:${item.phone}`} className="hover:text-foreground">{item.phone}</a></>}
+                    {item.phone && <> · <PhoneLink href={buildCallLink(item.phone)} className="hover:text-foreground">{displayPhone(item.phone)}</PhoneLink></>}
                   </div>
                 </div>
                 {done && <Badge variant="outline" className="text-success border-success/30 bg-success/10">Done</Badge>}
@@ -197,14 +199,14 @@ export function TodayReminders({ data, onChanged }: TodayRemindersProps) {
           ) : settings.sendMode === 'automatic' ? (
             <Button size="sm" variant="outline" onClick={sendSummaryAutomatic}>📤 Send Today&apos;s Summary to Admin</Button>
           ) : (
-            <a
+            <PhoneLink
               href={buildWhatsAppUrl(settings.adminNumber, summaryText)}
-              target="_blank"
-              rel="noreferrer"
+              newTab
+              editHref="/settings"
               onClick={() => { logMessage({ ...summaryBase, channel: 'whatsapp_link', status: 'opened' }).then(onChanged); }}
             >
               <Button size="sm" variant="outline">📤 Send Today&apos;s Summary to Admin</Button>
-            </a>
+            </PhoneLink>
           )}
           {isSummaryOverdue(settings, summarySent) && <span className="text-destructive">Today&apos;s summary hasn&apos;t been sent yet.</span>}
         </div>

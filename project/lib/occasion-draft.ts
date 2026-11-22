@@ -1,4 +1,4 @@
-import { normalizeIndianNumber } from '@/lib/phone';
+import { normalizePhone, toE164 } from '@/lib/phone';
 import { repeatRow, type RepeatValue } from '@/lib/repeat-value';
 import type { SpecialOccasion } from '@/lib/types';
 import type { OccasionCategory } from '@/lib/occasion-details';
@@ -190,7 +190,7 @@ export function validateDraft(d: OccasionDraft, type: OccasionTypeRow | undefine
   }
   const phone = d.contact_phone.trim() || sponsor.phone || '';
   if (needsRelation && !phone) return `${label}: the contact phone is required.`;
-  if (d.contact_phone.trim() && !normalizeIndianNumber(d.contact_phone)) return `${label}: enter a valid 10-digit contact phone.`;
+  if (d.contact_phone.trim() && !normalizePhone(d.contact_phone)) return `${label}: Enter a valid 10-digit mobile number (contact phone).`;
   return null;
 }
 
@@ -216,7 +216,7 @@ export function draftToRow(d: OccasionDraft, type: OccasionTypeRow | undefined, 
     occasion_name_ta: category === 'other' ? d.occasion_name_ta.trim() || (type?.key === 'other' ? '' : type?.name_ta) || null : null,
     contact_name: sameAsSponsor ? null : name,
     contact_title: d.contact_title || null,
-    contact_phone: d.contact_phone.trim() ? normalizeIndianNumber(d.contact_phone) : null,
+    contact_phone: toE164(d.contact_phone),
     contact_relation: d.contact_relation.trim() || null,
     linked_donation_type: d.linked_donation_type || null,
     linked_donation_details: d.linked_donation_type ? d.linked_donation_details.trim() || null : null,

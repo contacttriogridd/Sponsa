@@ -20,6 +20,7 @@ import { notifyDrawerDataChanged } from '@/lib/drawer-store';
 import { formatCurrency } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { MonthlySponsor } from '@/lib/types';
+import { openMonthlySponsorDrawer } from '@/lib/drawer-store';
 
 type Row = MonthlySponsor & { sponsors?: { whatsapp?: string | null; phone?: string | null } | null };
 
@@ -120,7 +121,16 @@ export function MonthlyRequestDialog({ open, onOpenChange, sponsors, month }: { 
           {ctx && !ctx.pay.upi_id && (
             <p className="text-xs flex gap-1.5 rounded-md bg-warning/10 p-2"><AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0 mt-0.5" />No UPI ID saved yet — add it in <Link href="/settings" className="text-primary underline">Settings</Link>.</p>
           )}
-          {noPhone > 0 && <p className="text-xs text-muted-foreground">{noPhone} sponsor{noPhone === 1 ? ' has' : 's have'} no mobile number and {noPhone === 1 ? 'is' : 'are'} skipped.</p>}
+          {noPhone > 0 && (
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>Skipped (invalid number): {noPhone}</p>
+              <ul className="flex flex-wrap gap-1">
+                {sponsors.filter((s) => !whatsappNumber(phoneOf(s))).map((s) => (
+                  <li key={s.id}><button type="button" className="underline hover:text-foreground" onClick={() => { onOpenChange(false); openMonthlySponsorDrawer(s.id); }}>{s.name} — Edit</button></li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {result ? (
             <div className="rounded-md border p-3 text-sm">{result}</div>
@@ -134,11 +144,11 @@ export function MonthlyRequestDialog({ open, onOpenChange, sponsors, month }: { 
               </div>
               <Textarea rows={8} value={message} onChange={(e) => setEdited((x) => ({ ...x, [`${current.id}|${lang}`]: e.target.value }))} className="text-sm" lang={lang === 'en' ? 'en' : 'ta'} />
               <div className="flex flex-wrap gap-2">
-                <a href={buildWhatsAppUrl(whatsappNumber(phoneOf(current))!, message)} target="_blank" rel="noreferrer"
+                <a href={buildWhatsAppUrl(phoneOf(current), message) || undefined} target="_blank" rel="noreferrer"
                   onClick={() => { log(current, message, 'whatsapp_link', 'opened'); next(); }}>
                   <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={!ctx}><MessageCircle className="h-4 w-4 mr-1.5" />{reachable.length > 1 ? 'Open WhatsApp & next' : 'Open WhatsApp'}</Button>
                 </a>
-                <a href={buildSmsUrl(phoneOf(current)!, message)} onClick={() => log(current, message, 'sms', 'opened')}>
+                <a href={buildSmsUrl(phoneOf(current), message) || undefined} onClick={() => log(current, message, 'sms', 'opened')}>
                   <Button variant="outline" disabled={!ctx}><MessageSquare className="h-4 w-4 mr-1.5" />SMS</Button>
                 </a>
                 {reachable.length > 1 && (
@@ -155,7 +165,7 @@ export function MonthlyRequestDialog({ open, onOpenChange, sponsors, month }: { 
               )}
             </>
           ) : (
-            <div className="rounded-md border p-3 text-sm">{reachable.length ? `Done — ${reachable.filter((s) => sent.has(s.id)).length} of ${reachable.length} requested.` : 'No sponsor to send to.'}</div>
+            <div className="rounded-md border p-3 text-sm">{reachable.length ? `Sent: ${reachable.filter((s) => sent.has(s.id)).length} · Skipped (invalid number): ${noPhone}` : 'No sponsor with a valid number to send to.'}</div>
           )}
         </div>
       </DialogContent>

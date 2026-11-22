@@ -1,4 +1,5 @@
 import { formatCurrency, normalizeDonationType } from '@/lib/constants';
+import { buildSmsLink, normalizePhone } from '@/lib/phone';
 import type { OrganizationNames } from '@/lib/organization';
 import type { Donation, Sponsor } from '@/lib/types';
 
@@ -164,17 +165,14 @@ export function donationSummary(donation: Pick<Donation, 'amount' | 'donation_da
   ].filter(Boolean).join(' · ');
 }
 
-/** Phone for sms: links — digits with a leading +, India's code added to 10-digit numbers. */
+/** Phone for sms: links (+91XXXXXXXXXX), via the shared normalizer; '' when invalid. */
 export function smsNumber(phone: string): string {
-  let digits = phone.replace(/\D/g, '');
-  if (digits.startsWith('00')) digits = digits.slice(2);
-  if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
-  if (digits.length === 10) digits = `91${digits}`;
-  return `+${digits}`;
+  return normalizePhone(phone)?.e164 ?? '';
 }
 
-export function buildSmsUrl(phone: string, message: string): string {
-  return `sms:${smsNumber(phone)}?body=${encodeURIComponent(message)}`;
+/** sms: link via the shared normalizer; null for a missing or invalid number. */
+export function buildSmsUrl(phone: string | null | undefined, message: string): string | null {
+  return buildSmsLink(phone, message);
 }
 
 export function buildEmailUrl(email: string, message: string): string {

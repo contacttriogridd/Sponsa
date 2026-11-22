@@ -21,6 +21,8 @@ import { runReminderEngineOncePerDay } from '@/lib/reminder-engine';
 import { DrawerHost } from '@/components/shared/DrawerHost';
 import { MessageConfirmHost } from '@/components/shared/MessageConfirmHost';
 import { loadReminderData, useLiveRefresh } from '@/lib/today-reminders-store';
+import { useNumbersToFixCount } from '@/lib/numbers-to-fix-store';
+import { PhoneOff } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard, Users, Calendar, Bell, HandHeart, Gift, BarChart3, Settings, Star, Sparkles,
@@ -74,6 +76,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }, [appUser]);
   useEffect(() => { refreshTodayCount(); }, [refreshTodayCount]);
   useLiveRefresh(refreshTodayCount);
+  // Admins: invalid saved phone numbers, until all are fixed.
+  const numbersToFix = useNumbersToFixCount(appUser?.role === 'admin');
 
   if (loading || !appUser) {
     return (
@@ -125,6 +129,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </Link>
           );
         })}
+        {appUser.role === 'admin' && numbersToFix > 0 && (
+          <Link
+            href="/settings/numbers"
+            onClick={() => setMobileOpen(false)}
+            className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+              pathname === '/settings/numbers' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}
+          >
+            <PhoneOff className="h-4 w-4 shrink-0" />
+            Numbers to fix
+            <span className="ml-auto min-w-5 h-5 px-1 rounded-full bg-destructive text-white text-xs flex items-center justify-center">{numbersToFix}</span>
+          </Link>
+        )}
       </nav>
 
       <div className="border-t border-border p-4">

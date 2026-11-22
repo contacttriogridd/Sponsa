@@ -14,10 +14,10 @@ import { AstroCombobox } from '@/components/monthly/AstroCombobox';
 import { supabase } from '@/lib/supabase/client';
 import { RAASIS, STARS, astroLabel, isValidCombination, padamNote, starsInRaasi } from '@/lib/natchathiram';
 import { FAMILY_RELATIONSHIPS, relationshipLabel } from '@/lib/festival';
-import { normalizeIndianNumber } from '@/lib/phone';
 import { formatDateShort } from '@/lib/constants';
 import { notifyDrawerDataChanged } from '@/lib/drawer-store';
 import type { MonthlyFamilyMember } from '@/lib/types';
+import { PhoneInput, phoneForSave } from '@/components/shared/PhoneInput';
 
 const EMPTY = { name: '', relationship: '', relationship_other: '', star: null as number | null, raasi: null as number | null, dob: '', phone: '', address: '', notes: '' };
 
@@ -74,7 +74,7 @@ export function FamilyMembersSection({ monthlySponsorId, drafts, onDraftsChange 
     if (!form.name.trim()) { setError('Name is required.'); return; }
     if (!form.relationship) { setError('Relationship is required.'); return; }
     if (form.star != null && !STARS[form.star]) { setError('Choose one of the 27 stars.'); return; }
-    if (form.phone.trim() && !normalizeIndianNumber(form.phone)) { setError('Enter a valid 10-digit phone number.'); return; }
+    if (phoneForSave(form.phone).error) { setError('Enter a valid 10-digit mobile number.'); return; }
     const payload = {
       name: form.name.trim(),
       relationship: form.relationship,
@@ -82,7 +82,7 @@ export function FamilyMembersSection({ monthlySponsorId, drafts, onDraftsChange 
       star: form.star,
       raasi: form.raasi,
       dob: form.dob || null,
-      phone: form.phone.trim() ? normalizeIndianNumber(form.phone) : null,
+      phone: phoneForSave(form.phone).value,
       address: form.address.trim() || null,
       notes: form.notes.trim() || null,
     };
@@ -185,7 +185,7 @@ export function FamilyMembersSection({ monthlySponsorId, drafts, onDraftsChange 
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="fm-phone">Phone / WhatsApp</Label>
-              <Input id="fm-phone" type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="Uses the sponsor's number if empty" />
+              <PhoneInput id="fm-phone" value={form.phone} onChange={(v) => set('phone', v)} placeholder="Sponsor's number if empty" />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="fm-address">Address</Label>
