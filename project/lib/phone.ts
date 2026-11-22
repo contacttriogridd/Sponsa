@@ -61,15 +61,23 @@ export function displayPhone(input: string | null | undefined): string {
 }
 
 // ---------------------------------------------------------------- links
-// Every wa.me / sms: / tel: link in the app comes from these. They return null
+// Every WhatsApp / sms: / tel: link in the app comes from these. They return null
 // for a missing or invalid number, so a link never opens WhatsApp's "Send to…"
 // picker or a broken chat. Messages are encodeURIComponent-encoded, so Tamil
 // text, ₹, emoji and line breaks survive.
 
+/**
+ * Click-to-chat link. Uses api.whatsapp.com/send rather than wa.me: wa.me
+ * redirects there and, in that redirect, replaces emoji such as 🙏 with "�"
+ * (seen on WhatsApp Web / Desktop). api.whatsapp.com/send opens the same chat
+ * directly — the WhatsApp app on phones, WhatsApp Web / Desktop on computers —
+ * with the message intact.
+ */
 export function buildWhatsAppLink(phone: string | null | undefined, message?: string | null): string | null {
   const n = normalizePhone(phone);
   if (!n) return null;
-  return message ? `https://wa.me/${n.waDigits}?text=${encodeURIComponent(message)}` : `https://wa.me/${n.waDigits}`;
+  const base = `https://api.whatsapp.com/send?phone=${n.waDigits}`;
+  return message ? `${base}&text=${encodeURIComponent(message)}` : base;
 }
 
 export function buildSmsLink(phone: string | null | undefined, message?: string | null): string | null {

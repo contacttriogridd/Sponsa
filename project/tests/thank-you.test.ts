@@ -5,8 +5,9 @@ import {
   formatDonationDate, formatThanksAmount, thankYouData, thankYouTemplatesFrom, thanksBlockReason, unfilledPlaceholders,
 } from '@/lib/thank-you';
 
-// Same as buildWhatsAppUrl in lib/whatsapp (which needs the Supabase client to load).
-const buildWhatsAppUrl = (phone: string, message: string) => `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+// lib/whatsapp's buildWhatsAppUrl is this (lib/whatsapp itself needs the Supabase client to load).
+import { buildWhatsAppLink } from '@/lib/phone';
+const buildWhatsAppUrl = (phone: string, message: string) => buildWhatsAppLink(phone, message)!;
 
 const names = { org_name_en: 'VP TRUST', org_name_ta: 'வள்ளலார் பசியாற்றும் அறக்கட்டளை' };
 const sathish = { full_name: 'Sathish', preferred_name: null };
@@ -92,15 +93,15 @@ test('Both: Tamil first, the divider, then English, each with its own organizati
   assert.deepEqual(unfilledPlaceholders(text), []);
   assert.equal(thanksBlockReason(text, food), null);
   const url = buildWhatsAppUrl('919629522777', text);
-  assert.equal(decodeURIComponent(url.split('?text=')[1]), text);
+  assert.equal(new URL(url).searchParams.get('text'), text);
   assert.ok(url.includes(encodeURIComponent(BOTH_DIVIDER)));
 });
 
 test('WhatsApp link keeps ₹, Tamil, emoji and line breaks', () => {
   const text = fillKnown(THANK_YOU_TEMPLATE_TA, thankYouData(sathish, money, names, 'ta'));
   const url = buildWhatsAppUrl('919876543210', text);
-  assert.ok(url.startsWith('https://wa.me/919876543210?text='));
-  assert.equal(decodeURIComponent(url.split('?text=')[1]), text);
+  assert.ok(url.startsWith('https://api.whatsapp.com/send?phone=919876543210&text='));
+  assert.equal(new URL(url).searchParams.get('text'), text);
   assert.ok(url.includes('%E2%82%B9')); // ₹
   assert.ok(url.includes('%0A')); // line break
 });

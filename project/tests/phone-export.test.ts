@@ -40,8 +40,10 @@ test('normalizePhone: a foreign number written with + is kept', () => {
 test('links: correct chat, message encoded, never a link without a valid number', () => {
   const msg = 'வணக்கம் ₹1,100 🙏\nநன்றி';
   const link = buildWhatsAppLink('98765 43210', msg)!;
-  assert.ok(link.startsWith('https://wa.me/919876543210?text='));
-  assert.equal(decodeURIComponent(link.split('?text=')[1]), msg);
+  // api.whatsapp.com/send, not wa.me: wa.me's redirect turns 🙏 into "�".
+  assert.ok(link.startsWith('https://api.whatsapp.com/send?phone=919876543210&text='));
+  assert.equal(new URL(link).searchParams.get('text'), msg);
+  assert.equal(buildWhatsAppLink('9876543210'), 'https://api.whatsapp.com/send?phone=919876543210');
   assert.equal(buildWhatsAppLink('12345', msg), null);
   assert.equal(buildWhatsAppLink('', msg), null, 'no "Send to…" picker link');
   assert.equal(buildSmsLink('09876543210', 'Hi'), 'sms:+919876543210?body=Hi');
