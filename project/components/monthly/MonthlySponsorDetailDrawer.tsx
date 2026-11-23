@@ -30,6 +30,7 @@ import { PAKSHA_OPTIONS, entryAmount, hasPaksha, nextSponsorEvent, sponsorEvents
 import type { MonthlyPayment, MonthlySponsor, MonthlySponsorStatus, MonthlyWishLog } from '@/lib/types';
 import { PhoneLink } from '@/components/shared/PhoneLink';
 import { buildCallLink, displayPhone } from '@/lib/phone';
+import { AMOUNT_NOT_SET, AMOUNT_NOT_SET_EN, amountLabel } from '@/lib/amount';
 
 type Row = MonthlySponsor & { sponsors?: { full_name: string } | null };
 
@@ -232,7 +233,7 @@ export function MonthlySponsorDetailDrawer({ monthlyId }: { monthlyId: string })
 
               <Section title="Details">
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                  <Detail label="Monthly amount">{sponsor.monthly_amount != null ? formatCurrency(Number(sponsor.monthly_amount)) : '—'}</Detail>
+                  <Detail label="Monthly amount">{amountLabel(sponsor.monthly_amount)}</Detail>
                   <Detail label="Payment day">{sponsor.payment_day ? `Day ${sponsor.payment_day} of each month` : '—'}</Detail>
                   <Detail label="Payment mode">{sponsor.payment_mode || '—'}</Detail>
                   <Detail label="Start date">{sponsor.start_date ? formatDateShort(sponsor.start_date) : '—'}</Detail>

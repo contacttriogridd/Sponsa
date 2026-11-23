@@ -15,6 +15,7 @@ import { formatCurrency, formatDateShort, OCCASION_ICONS, normalizeDonationType 
 import { occasionHeadline, occasionRelation } from '@/lib/occasion-text';
 import { StarDaysThisWeekCard } from '@/components/monthly/StarDaysThisWeekCard';
 import { DatesBoard } from '@/components/dashboard/DatesBoard';
+import { RemindersDueCard } from '@/components/dashboard/RemindersDueCard';
 import { RecordDonationButton } from '@/components/shared/RecordDonationDialog';
 import { receivedInMonth, sumDonations } from '@/lib/donations';
 import { todayIst } from '@/lib/monthly-sponsors';
@@ -39,6 +40,7 @@ export default function DashboardPage() {
   if (loading) return <AppLayout><LoadingSkeleton variant="grid" className="mb-6" /><LoadingSkeleton /></AppLayout>;
   return <AppLayout><div className="space-y-6"><div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3"><div><p className="text-sm text-muted-foreground">{todayLabel()}</p><h1 className="text-2xl lg:text-3xl font-semibold mt-1">Good morning<span className="text-primary">.</span></h1><p className="text-muted-foreground mt-1">Here is what needs your attention today.</p></div><div className="flex gap-2"><RecordDonationButton variant="outline" onSaved={()=>load()} /><Link href="/sponsors/new"><Button><Users className="h-4 w-4 mr-2" />Add Sponsor</Button></Link></div></div>
   <TodayReminders data={reminders} onChanged={load} />
+  <RemindersDueCard />
   <DatesBoard items={reminders?.items||[]} />
   <div className="grid grid-cols-2 xl:grid-cols-5 gap-3 lg:gap-4"><StatCard label="Total Sponsors" value={sponsors.length} icon={Users} iconColor="text-primary" /><StatCard label="Special Days This Week" value={thisWeekCount} icon={CalendarDays} iconColor="text-warning" /><StatCard label="Pending Follow-ups" value={tasks.length} icon={Bell} iconColor="text-destructive" /><StatCard label="Total Donations" value={formatCurrency(totalDonations)} icon={Gift} iconColor="text-success" trend={`This month ${formatCurrency(monthTotal)}`} /><StatCard label="People Helped" value={people} icon={HandHeart} iconColor="text-primary" /></div>
   <div className="grid xl:grid-cols-[1.35fr_1fr] gap-6"><UpcomingPastCards items={reminders?.items||[]} />

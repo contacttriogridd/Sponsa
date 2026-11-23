@@ -16,6 +16,7 @@ import { MonthlyReportDownload } from '@/components/shared/MonthlyReportDownload
 import { SPONSORSHIP_STATUS_LABELS, normalizeDonationType } from '@/lib/constants';
 
 import { todayIst } from '@/lib/monthly-sponsors';
+import { AMOUNT_NOT_SET, AMOUNT_NOT_SET_EN, amountLabel } from '@/lib/amount';
 
 interface ReportData {
   totalSponsors: number;
@@ -110,7 +111,7 @@ export default function ReportsPage() {
       ['Sponsor', 'Occasion', 'Special Date', 'Status', 'Category', 'Requested Amount (₹)', 'Requested On', 'Channel', 'Notes'],
       ...(data || []).map((r: any) => [
         r.sponsors?.full_name || r.monthly_sponsors?.name, r.occasion_name, ddmmyyyy(r.special_date), SPONSORSHIP_STATUS_LABELS[r.status] || r.status,
-        r.category, r.requested_amount != null ? plainAmount(r.requested_amount) : '', ddmmyyyy(r.request_sent_at || r.created_at), r.channel, r.notes,
+        r.category, r.requested_amount != null ? plainAmount(r.requested_amount) : AMOUNT_NOT_SET_EN, ddmmyyyy(r.request_sent_at || r.created_at), r.channel, r.notes,
       ]),
     ], 'sponsorships.csv');
   }

@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import type { Donation, Interaction, MonthlySponsor, SpecialOccasion, Sponsor, SponsorshipRequest, Task } from '@/lib/types';
 import { PhoneLink } from '@/components/shared/PhoneLink';
 import { buildCallLink, displayPhone } from '@/lib/phone';
+import { amountLabel } from '@/lib/amount';
 
 interface ReminderRow {
   id: string;
@@ -272,6 +273,7 @@ export function SponsorDetailDrawer({ sponsorId, occasionId, open }: { sponsorId
                   <Detail label="Name">{s.full_name}{s.preferred_name && s.preferred_name !== s.full_name ? ` (${s.preferred_name})` : ''}</Detail>
                   <Detail label="Phone">{s.phone ? <PhoneLink href={buildCallLink(s.phone)} onEdit={() => setDialog('edit')} className="text-primary hover:underline">{displayPhone(s.phone)}</PhoneLink> : '—'}</Detail>
                   <Detail label="Alternate phone">{alternate ? <PhoneLink href={buildCallLink(alternate)} onEdit={() => setDialog('edit')} className="text-primary hover:underline">{displayPhone(alternate)}</PhoneLink> : '—'}</Detail>
+                  <Detail label="Sponsorship amount">{amountLabel(s.sponsorship_amount)}</Detail>
                   <Detail label="Email">{s.email ? <a href={`mailto:${s.email}`} className="text-primary hover:underline inline-flex items-center gap-1"><Mail className="h-3.5 w-3.5" />{s.email}</a> : '—'}</Detail>
                   <Detail label="Address">{s.address ? <span className="inline-flex gap-1"><MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />{s.address}</span> : '—'}</Detail>
                   <Detail label="Area / City">{[s.city, s.district].filter(Boolean).join(', ') || '—'}</Detail>

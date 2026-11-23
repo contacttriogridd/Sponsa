@@ -43,6 +43,7 @@ import type { MonthlyFamilyMember, MonthlyPayment, MonthlySponsor } from '@/lib/
 import { relationshipLabel } from '@/lib/festival';
 import { PhoneLink } from '@/components/shared/PhoneLink';
 import { buildCallLink, displayPhone } from '@/lib/phone';
+import { AMOUNT_NOT_SET, AMOUNT_NOT_SET_EN, amountLabel } from '@/lib/amount';
 
 type Row = EventSponsorRow;
 
@@ -306,7 +307,7 @@ export default function MonthlySponsorsPage() {
                         </div>
                         <div className="flex items-center gap-2 flex-wrap lg:justify-end">
                           <div className="text-right mr-1">
-                            <div className="font-semibold text-sm">{s.monthly_amount != null ? formatCurrency(Number(s.monthly_amount)) : '—'}</div>
+                            <div className={s.monthly_amount != null ? 'font-semibold text-sm' : 'text-xs text-muted-foreground'}>{amountLabel(s.monthly_amount)}</div>
                             {payment?.status === 'paid' ? (
                               <div className="text-xs text-success">Paid{payment.paid_on ? ` ${formatDateShort(payment.paid_on)}` : ''}{payment.mode ? ` · ${payment.mode}` : ''}</div>
                             ) : donatedBySponsor.get(s.id)?.length ? (

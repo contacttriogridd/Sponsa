@@ -21,6 +21,7 @@ import { formatCurrency } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { MonthlySponsor } from '@/lib/types';
 import { openMonthlySponsorDrawer } from '@/lib/drawer-store';
+import { AMOUNT_NOT_SET, AMOUNT_NOT_SET_EN, amountLabel } from '@/lib/amount';
 
 type Row = MonthlySponsor & { sponsors?: { whatsapp?: string | null; phone?: string | null } | null };
 
@@ -139,7 +140,7 @@ export function MonthlyRequestDialog({ open, onOpenChange, sponsors, month }: { 
               <div className="flex items-center gap-2 flex-wrap text-sm">
                 {reachable.length > 1 && <Badge variant="outline">{index + 1} of {reachable.length}</Badge>}
                 <span className="font-medium">{current.name}</span>
-                <span className="text-muted-foreground">{current.monthly_amount != null ? formatCurrency(Number(current.monthly_amount)) : ''} · due {requestDueDate(current, month).slice(8)}</span>
+                <span className="text-muted-foreground">{amountLabel(current.monthly_amount)} · due {requestDueDate(current, month).slice(8)}</span>
                 {sent.has(current.id) && <Badge variant="outline" className="text-success border-success/40"><CheckCircle2 className="h-3 w-3 mr-1" />Requested</Badge>}
               </div>
               <Textarea rows={8} value={message} onChange={(e) => setEdited((x) => ({ ...x, [`${current.id}|${lang}`]: e.target.value }))} className="text-sm" lang={lang === 'en' ? 'en' : 'ta'} />

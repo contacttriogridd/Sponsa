@@ -21,6 +21,7 @@ import { totalsBySponsor, type DonationCategory } from '@/lib/donations';
 import { useDrawerDataChanged } from '@/lib/drawer-store';
 import { PhoneLink } from '@/components/shared/PhoneLink';
 import { buildCallLink, buildWhatsAppLink } from '@/lib/phone';
+import { amountLabel } from '@/lib/amount';
 
 /** The donation category a sponsors tab records into. */
 const TAB_CATEGORY: Record<EventTab, DonationCategory> = {
@@ -171,6 +172,7 @@ export default function SponsorsPage() {
                   <div className="hidden md:block w-28 text-right">
                     <div className="font-semibold text-sm">{formatCurrency(totals.get(s.id) || 0)}</div>
                     <div className="text-xs text-muted-foreground">donated</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5" title="Sponsorship amount">{s.sponsorship_amount != null ? `Pledge ${amountLabel(s.sponsorship_amount)}` : 'Amount not set'}</div>
                   </div>
                   {appUser?.role === 'admin' && (
                     <Button variant="ghost" size="icon" aria-label={`Delete ${s.full_name}`} onClick={() => setToDelete(s)} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10">

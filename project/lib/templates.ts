@@ -1,3 +1,4 @@
+import { dropMissingAmounts } from '@/lib/amount';
 import { formatOrganizationName, type OrganizationNames } from '@/lib/organization';
 
 /** Sign-off every template ends with; new templates start with it. */
@@ -24,7 +25,9 @@ export function renderTemplate(
     organization_name_english: organization.org_name_en,
     organization_name_tamil: organization.org_name_ta,
   };
-  return body
+  // An amount given as empty (not set) drops its sentence; one not given at all stays as {{…}} (previews).
+  const emptyAmounts = ['amount', 'monthly_amount'].filter((k) => k in data);
+  return dropMissingAmounts(body, values, emptyAmounts)
     .replace(/\r\n?/g, '\n')
     .replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) => values[key] ?? match);
 }

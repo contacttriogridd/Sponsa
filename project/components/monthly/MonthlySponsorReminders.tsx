@@ -19,6 +19,7 @@ import { openMonthlySponsorDrawer } from '@/lib/drawer-store';
 import type { MonthlyFamilyMember, MonthlyPayment, MonthlySponsor } from '@/lib/types';
 import { PhoneLink } from '@/components/shared/PhoneLink';
 import { buildCallLink } from '@/lib/phone';
+import { AMOUNT_NOT_SET, AMOUNT_NOT_SET_EN, amountLabel } from '@/lib/amount';
 
 /**
  * Reminders page section: star days within the reminder window (default
@@ -82,7 +83,7 @@ export function MonthlySponsorReminders() {
                 <Badge variant={d.daysUntil <= 0 ? 'destructive' : 'secondary'}>{whenLabel(d.daysUntil)}</Badge>
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                {d.sponsor.monthly_amount != null ? `${formatCurrency(Number(d.sponsor.monthly_amount))} · ` : ''}due {formatStarDate(d.dueDate)}
+                {amountLabel(d.sponsor.monthly_amount)} · due {formatStarDate(d.dueDate)}
               </p>
             </div>
             {d.sponsor.phone && (

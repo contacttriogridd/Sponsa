@@ -24,6 +24,7 @@ import { useAuth } from '@/lib/auth-context';
 import { CATEGORY_META, DONATION_CATEGORIES, PAYMENT_MODES, type DonationCategory } from '@/lib/donations';
 import { cn } from '@/lib/utils';
 import { PhoneInput, phoneForSave } from '@/components/shared/PhoneInput';
+import { parseOptionalAmount } from '@/lib/amount';
 
 /** The occasion type a category adds (Monthly and the one-time kinds have their own fields). */
 const CATEGORY_TYPE: Partial<Record<DonationCategory, string>> = {
@@ -159,7 +160,7 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
     const mode = form.payment_mode === 'Bank Transfer' ? 'Bank' : ['Cash', 'UPI'].includes(form.payment_mode) ? form.payment_mode : null;
     const row = {
       name: form.full_name.trim(), phone: phoneForSave(form.whatsapp).value || phoneForSave(form.phone).value,
-      monthly_amount: Number(monthly.amount || form.sponsorship_amount) || null, payment_day: Number(monthly.day),
+      monthly_amount: parseOptionalAmount(monthly.amount).value ?? parseOptionalAmount(form.sponsorship_amount).value, payment_day: Number(monthly.day),
       start_date: `${monthly.start_month}-01`, end_date: monthly.end_month ? lastDayOf(monthly.end_month) : null,
       status: form.status === 'archived' ? 'stopped' : 'active', sponsor_id: sponsorId, relationship: 'Self',
       address: form.address || null, payment_mode: mode,
@@ -207,11 +208,14 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
     const alt = phoneForSave(form.phone);
     if (wa.error) { setError(`Mobile (WhatsApp): ${wa.error}.`); return; }
     if (alt.error) { setError(`Alternate mobile: ${alt.error}.`); return; }
-    if (!isEdit && category !== 'Monthly' && !(Number(form.sponsorship_amount) > 0)) { setError('Sponsorship amount is required.'); return; }
+    // Amounts are optional (sponsors often confirm later); if given, they must be > 0. Empty is saved as NULL, never 0.
+    const amount = parseOptionalAmount(form.sponsorship_amount);
+    if (amount.error) { setError(`Sponsorship amount: ${amount.error}`); return; }
+    const monthlyAmount = parseOptionalAmount(monthly.amount);
+    if (category === 'Monthly' && monthlyAmount.error) { setError(`Monthly amount: ${monthlyAmount.error}`); return; }
     if (category === 'Monthly') {
       const day = Number(monthly.day);
       if (!(day >= 1 && day <= 31)) { setError('Monthly Sponsor: the monthly date (1–31) is required.'); return; }
-      if (!(Number(monthly.amount || form.sponsorship_amount) > 0)) { setError('Monthly Sponsor: the monthly amount is required.'); return; }
       if (!monthly.start_month) { setError('Monthly Sponsor: the start month is required.'); return; }
       if (monthly.end_month && monthly.end_month < monthly.start_month) { setError('Monthly Sponsor: the end month is before the start month.'); return; }
     } else if (!ONE_TIME.includes(category)) {
@@ -255,7 +259,7 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
       status: form.status,
       created_by: appUser?.id || null,
       sponsor_category: category,
-      sponsorship_amount: form.sponsorship_amount ? Number(form.sponsorship_amount) : category === 'Monthly' && monthly.amount ? Number(monthly.amount) : null,
+      sponsorship_amount: amount.value ?? (category === 'Monthly' ? monthlyAmount.value : null),
       payment_mode: form.payment_mode || null,
       reminder_days_before: reminderDays,
       preferred_language: form.preferred_language || null,
@@ -365,7 +369,7 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-1.5">
-            <Label htmlFor="sp-amount">Sponsorship amount (₹){!isEdit && form.sponsor_category !== 'Monthly' && <span className="text-destructive"> *</span>}</Label>
+            <Label htmlFor="sp-amount">Sponsorship amount (₹) <span className="text-muted-foreground font-normal">— optional</span></Label>
             <Input id="sp-amount" type="number" min="0" inputMode="numeric" value={form.sponsorship_amount} onChange={(e) => set('sponsorship_amount', e.target.value)} placeholder="e.g. 5000" />
           </div>
           <div className="space-y-1.5">
@@ -400,7 +404,7 @@ export function SponsorForm({ sponsor, onSaved, onCancel }: SponsorFormProps) {
               <Input id="m-day" type="number" min="1" max="31" inputMode="numeric" value={monthly.day} onChange={(e) => setM('day', e.target.value)} placeholder="e.g. 5" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="m-amount">Monthly amount (₹) <span className="text-destructive">*</span></Label>
+              <Label htmlFor="m-amount">Monthly amount (₹) <span className="text-muted-foreground font-normal">— optional</span></Label>
               <Input id="m-amount" type="number" min="0" inputMode="numeric" value={monthly.amount} onChange={(e) => setM('amount', e.target.value)} placeholder={form.sponsorship_amount || 'e.g. 1000'} />
             </div>
             <div className="space-y-1.5">

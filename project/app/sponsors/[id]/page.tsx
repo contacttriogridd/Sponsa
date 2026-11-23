@@ -38,6 +38,8 @@ import { MessageHistory } from '@/components/shared/MessageHistory';
 import { useDrawerDataChanged } from '@/lib/drawer-store';
 import { PhoneLink } from '@/components/shared/PhoneLink';
 import { buildCallLink, displayPhone } from '@/lib/phone';
+import { AMOUNT_NOT_SET, AMOUNT_NOT_SET_EN, amountLabel } from '@/lib/amount';
+import { SponsorReminderHistory } from '@/components/sponsorships/SponsorReminderHistory';
 
 type DialogType = 'edit' | 'addFamily' | 'editFamily' | 'addOccasion' | 'editOccasion' | 'addDonation' | 'addSponsorship' | null;
 
@@ -243,6 +245,7 @@ export default function SponsorDetailPage() {
             <div className="text-center">
               <div className="text-lg font-bold">{formatCurrency(sumDonations(donations))}</div>
               <div className="text-xs text-muted-foreground">Total Donated</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Sponsorship amount: {amountLabel(sponsor.sponsorship_amount)}</div>
             </div>
             <div className="text-center">
               <div className="text-lg font-bold">{donations.length}</div>
@@ -277,6 +280,7 @@ export default function SponsorDetailPage() {
             <TabsTrigger value="occasions">Occasions ({occasions.length})</TabsTrigger>
             <TabsTrigger value="sponsorships">Sponsorships ({requests.length})</TabsTrigger>
             <TabsTrigger value="donations">Donations ({donations.length})</TabsTrigger>
+            <TabsTrigger value="reminders">Reminders</TabsTrigger>
             <TabsTrigger value="timeline">Timeline</TabsTrigger>
             <TabsTrigger value="messages">📨 Message History</TabsTrigger>
           </TabsList>
@@ -427,7 +431,7 @@ export default function SponsorDetailPage() {
                         {r.special_date ? ` · ${formatDate(r.special_date)}` : ''}
                         {r.food_type ? ` · ${r.food_type}` : ''}
                         {r.people_count ? ` · ${r.people_count} people` : ''}
-                        {r.requested_amount ? ` · ${formatCurrency(Number(r.requested_amount))}` : ''}
+                        {` · ${amountLabel(r.requested_amount)}`}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -450,6 +454,10 @@ export default function SponsorDetailPage() {
           </TabsContent>
 
           {/* Donations */}
+          <TabsContent value="reminders" className="space-y-3 mt-4">
+            <SponsorReminderHistory sponsorId={sponsor.id} occasions={occasions} />
+          </TabsContent>
+
           <TabsContent value="donations" className="space-y-3 mt-4">
             <div className="flex justify-end">
               <Button size="sm" onClick={() => setDialog('addDonation')}>

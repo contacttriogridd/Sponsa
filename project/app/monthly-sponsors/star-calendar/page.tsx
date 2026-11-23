@@ -28,6 +28,7 @@ import { formatCurrency } from '@/lib/constants';
 import type { MonthlyFamilyMember, MonthlySponsor } from '@/lib/types';
 import { PhoneLink } from '@/components/shared/PhoneLink';
 import { buildCallLink, displayPhone } from '@/lib/phone';
+import { AMOUNT_NOT_SET, AMOUNT_NOT_SET_EN, amountLabel } from '@/lib/amount';
 
 const WEEKDAYS = [
   { ta: 'ஞாயிறு', en: 'Sun' }, { ta: 'திங்கள்', en: 'Mon' }, { ta: 'செவ்வாய்', en: 'Tue' }, { ta: 'புதன்', en: 'Wed' },
@@ -356,7 +357,7 @@ export default function StarCalendarPage() {
                         <PhoneLink href={buildCallLink(w.sponsor.phone)} onEdit={() => { setSelected(null); openMonthlySponsorDrawer(w.sponsor.id); }} className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{displayPhone(w.sponsor.phone)}</PhoneLink>
                       )}
                     </div>
-                    {w.amount != null && <span className="text-sm font-medium">{formatCurrency(w.amount)}</span>}
+                    <span className="text-sm font-medium">{amountLabel(w.amount, AMOUNT_NOT_SET_EN)}</span>
                   </div>
                 ))}
               </div>

@@ -5,6 +5,7 @@
  * same keys, so both stay in sync. Kept free of Supabase so it can be tested.
  */
 
+import { dropMissingAmounts } from '@/lib/amount';
 import { OBSERVANCE_KEYS, OBSERVANCE_META, PAKSHA_EVENTS, type ObservanceKey, type ObservanceView, type Paksha } from '@/lib/observances';
 import type { OrganizationNames } from '@/lib/organization';
 
@@ -169,7 +170,7 @@ export function eventAmount(amount: number | null): string {
 
 /** Fills the placeholders; one with no value becomes empty, so a raw {{…}} never goes out. */
 export function fillEventTemplate(body: string, data: Record<string, string>): string {
-  return body.replace(/\r\n?/g, '\n').replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, key: string) => data[key] ?? '');
+  return dropMissingAmounts(body, data).replace(/\r\n?/g, '\n').replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, key: string) => data[key] ?? '');
 }
 
 /**

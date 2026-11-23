@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import type { MonthlyPayment, MonthlySponsor } from '@/lib/types';
 import { PhoneLink } from '@/components/shared/PhoneLink';
 import { buildCallLink, displayPhone } from '@/lib/phone';
+import { AMOUNT_NOT_SET, AMOUNT_NOT_SET_EN, amountLabel } from '@/lib/amount';
 
 export type EventSponsorRow = MonthlySponsor & { sponsors?: { full_name: string; whatsapp?: string | null; phone?: string | null } | null };
 
@@ -146,7 +147,7 @@ export function EventWishesCard({ sponsors, events, today, starToday, starTomorr
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-3">
                       {phone ? <PhoneLink href={buildCallLink(phone)} onEdit={() => openMonthlySponsorDrawer(w.sponsor.id)} className="inline-flex items-center gap-1 hover:text-foreground"><Phone className="h-3 w-3" />{displayPhone(phone)}</PhoneLink> : <span>No phone number</span>}
-                      <span className="font-medium text-foreground">{w.amount != null ? formatCurrency(w.amount) : '—'}</span>
+                      <span className="font-medium text-foreground">{amountLabel(w.amount)}</span>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -198,7 +199,7 @@ export function EventWishesCard({ sponsors, events, today, starToday, starTomorr
                 <li key={w.sponsor.id} className="text-sm flex items-center gap-2 rounded-lg border border-border px-2.5 py-1.5">
                   <button type="button" onClick={() => openMonthlySponsorDrawer(w.sponsor.id)} className="hover:text-primary truncate text-left">{w.sponsor.name}</button>
                   {starTomorrow.has(w.sponsor.id) && <span title="Star day too">⭐</span>}
-                  <span className="ml-auto text-xs text-muted-foreground shrink-0">{w.amount != null ? formatCurrency(w.amount) : ''}</span>
+                  <span className="ml-auto text-xs text-muted-foreground shrink-0">{amountLabel(w.amount, AMOUNT_NOT_SET_EN)}</span>
                 </li>
               ))}
             </ul>

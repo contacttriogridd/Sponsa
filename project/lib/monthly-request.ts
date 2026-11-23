@@ -3,6 +3,7 @@
  * in Tamil and English. Pure, so it can be tested.
  */
 
+import { dropMissingAmounts } from '@/lib/amount';
 import type { OrganizationNames } from '@/lib/organization';
 
 export type RequestLanguage = 'ta' | 'en' | 'both';
@@ -45,7 +46,8 @@ export function requestValues(sponsor: RequestSponsor, month: string, lang: 'ta'
 
 /** Fills placeholders; one without a value becomes empty so a raw {{…}} never goes out. */
 export function fillRequest(body: string, values: Record<string, string>): string {
-  return body.replace(/\r\n?/g, '\n').replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, k: string) => values[k] ?? '');
+  // No amount: "Amount: ₹{{amount}}." is left out rather than sent as "₹".
+  return dropMissingAmounts(body, values).replace(/\r\n?/g, '\n').replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, k: string) => values[k] ?? '');
 }
 
 /** Tamil, English, or both (Tamil first, a blank line, then English). */

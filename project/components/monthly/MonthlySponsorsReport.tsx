@@ -12,6 +12,7 @@ import type { Donation, MonthlyPayment, MonthlySponsor } from '@/lib/types';
 import { donationMonth, sumDonations } from '@/lib/donations';
 import { downloadCsv } from '@/lib/export-download';
 import { ddmmyyyy, exportPhone, plainAmount } from '@/lib/export';
+import { AMOUNT_NOT_SET, AMOUNT_NOT_SET_EN, amountLabel } from '@/lib/amount';
 
 interface MonthTotal { month: string; collected: number; pending: number }
 
@@ -71,7 +72,7 @@ export function MonthlySponsorsReport() {
         s.name, exportPhone(s.phone), ddmmyyyy(s.dob),
         s.raasi != null ? `${RAASIS[s.raasi].ta} (${RAASIS[s.raasi].en})` : '',
         s.star != null ? `${STARS[s.star].ta} (${STARS[s.star].en})` : '',
-        s.monthly_amount != null ? plainAmount(s.monthly_amount) : '', s.payment_day ?? '', ddmmyyyy(s.start_date), s.status, s.notes,
+        s.monthly_amount != null ? plainAmount(s.monthly_amount) : AMOUNT_NOT_SET_EN, s.payment_day ?? '', ddmmyyyy(s.start_date), s.status, s.notes,
       ]),
     ], 'monthly-sponsors.csv');
   }

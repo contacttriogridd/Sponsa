@@ -20,6 +20,10 @@ import { useAuth } from '@/lib/auth-context';
 import type { MessageLog } from '@/lib/types';
 import { PhoneLink } from '@/components/shared/PhoneLink';
 import { buildCallLink } from '@/lib/phone';
+import { AMOUNT_NOT_SET, AMOUNT_NOT_SET_EN, amountLabel } from '@/lib/amount';
+import { PendingView, SentView, UpcomingView } from '@/components/sponsorships/UpcomingSponsorships';
+import { remindersPendingToday, type UpcomingEvent } from '@/lib/upcoming-sponsorships';
+import { loadSentReminders, loadUpcomingEvents, type SentReminder } from '@/lib/upcoming-sponsorships-store';
 
 /** The request flow; older statuses are still shown and kept. */
 const FLOW = ['requested', 'confirmed', 'paid', 'declined', 'no_response'];
@@ -43,7 +47,16 @@ export default function SponsorshipsPage() {
   const { appUser } = useAuth();
   const [deleting, setDeleting] = useState<DeletableRecord | null>(null);
   const [items, setItems] = useState<any[]>([]);
-  const [filter, setFilter] = useState('all');
+  // Opens on the 3-day view; ?tab=pending / sent / upcoming (e.g. from the dashboard card).
+  const [filter, setFilter] = useState('upcoming');
+  const [upcoming, setUpcoming] = useState<UpcomingEvent[]>([]);
+  const [sent, setSent] = useState<SentReminder[]>([]);
+  const [remindersReady, setRemindersReady] = useState(true);
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab === 'pending') setFilter('reminder_pending');
+    else if (tab === 'sent') setFilter('reminder_sent');
+  }, []);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -58,6 +71,8 @@ export default function SponsorshipsPage() {
       : full.data;
     setItems(data || []);
     setLoading(false);
+    const [u, r] = await Promise.all([loadUpcomingEvents(true), loadSentReminders()]);
+    setUpcoming(u.events); setRemindersReady(u.ready); setSent(r);
   }, []);
   useEffect(() => { load(); }, [load]);
   useDrawerDataChanged(load);
@@ -83,7 +98,7 @@ export default function SponsorshipsPage() {
           <div>
             <p className="text-sm text-muted-foreground">Sponsorship Requests</p>
             <h1 className="text-2xl font-semibold mt-1">Sponsorships</h1>
-            <p className="text-sm text-muted-foreground mt-1">Requested → Confirmed → Paid. A request sent to a sponsor is added here automatically; recording their donation marks it Paid.</p>
+            <p className="text-sm text-muted-foreground mt-1">Every sponsor event in the next 3 days, with D-3 / D-2 / D-1 reminders. Requested → Confirmed → Paid: a request sent is added here automatically, and recording the donation marks it Paid.</p>
           </div>
           <Link href="/sponsorships/new">
             <Button><Plus className="h-4 w-4 mr-2" />New Request</Button>
@@ -94,6 +109,12 @@ export default function SponsorshipsPage() {
           <div className="flex flex-col md:flex-row gap-3">
             <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by sponsor or occasion..." className="flex-1" />
             <div className="flex flex-wrap gap-1">
+              {([['upcoming', 'Upcoming (3 days)', upcoming.length], ['reminder_sent', 'Reminder sent', new Set(sent.map((r) => `${r.event_key}|${r.event_date}`)).size], ['reminder_pending', 'Reminder pending', remindersPendingToday(upcoming).length]] as const).map(([key, label, n]) => (
+                <Button key={key} variant={filter === key ? 'secondary' : 'ghost'} size="sm" onClick={() => setFilter(key)}>
+                  {label}<span className={key === 'reminder_pending' && n > 0 ? 'ml-1 text-destructive font-semibold' : 'ml-1 text-muted-foreground'}>{n}</span>
+                </Button>
+              ))}
+              <span className="w-px bg-border mx-1 hidden md:block" />
               {FILTERS.map((s) => (
                 <Button key={s} variant={filter === s ? 'secondary' : 'ghost'} size="sm" onClick={() => setFilter(s)}>
                   {s === 'all' ? 'All' : SPONSORSHIP_STATUS_LABELS[s] || s}
@@ -104,8 +125,17 @@ export default function SponsorshipsPage() {
           </div>
         </Card>
 
+        {!remindersReady && ['upcoming', 'reminder_sent', 'reminder_pending'].includes(filter) && (
+          <p className="text-sm text-warning bg-warning/10 rounded-lg px-3 py-2">Reminder tracking needs database migration 00030. Events still show; the D-3 / D-2 / D-1 chips start working after it runs.</p>
+        )}
         {loading ? (
           <div className="py-10 text-center text-muted-foreground">Loading...</div>
+        ) : filter === 'upcoming' ? (
+          <UpcomingView events={upcoming} query={query} onChanged={load} />
+        ) : filter === 'reminder_pending' ? (
+          <PendingView events={remindersPendingToday(upcoming)} query={query} onChanged={load} />
+        ) : filter === 'reminder_sent' ? (
+          <SentView rows={sent} query={query} />
         ) : (
           <div className="grid gap-3">
             {filtered.map((r) => {
@@ -132,7 +162,7 @@ export default function SponsorshipsPage() {
                         {r.special_date ? ` · ${formatDateShort(r.special_date)}` : ''}
                         {r.food_type ? ` · ${r.food_type}` : ''}
                         {r.people_count ? ` · ${r.people_count} people` : ''}
-                        {r.requested_amount ? ` · ${formatCurrency(Number(r.requested_amount))}` : ''}
+                        {` · ${amountLabel(r.requested_amount)}`}
                       </div>
                       {(r.request_sent_at || r.donations) && (
                         <div className="text-xs text-muted-foreground mt-0.5">
