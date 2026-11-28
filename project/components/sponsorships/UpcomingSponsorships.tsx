@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BellRing, CheckCircle2, MessageCircle, MoreVertical, Phone } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { PhoneLink } from '@/components/shared/PhoneLink';
 import { SponsorWishDialog } from '@/components/shared/SponsorWishDialog';
-import { MonthlyRequestDialog } from '@/components/monthly/MonthlyRequestDialog';
 import { useAuth } from '@/lib/auth-context';
 import { amountLabel } from '@/lib/amount';
 import { buildCallLink, displayPhone } from '@/lib/phone';
@@ -22,6 +21,9 @@ import { GROUPS, NOT_REQUESTED, STAGES, STATUS_LABELS, stageForDays, type Slot, 
 import { markReminderSent, setEventStatus, type SentReminder } from '@/lib/upcoming-sponsorships-store';
 import { cn } from '@/lib/utils';
 import type { SpecialOccasion, Sponsor } from '@/lib/types';
+import { MonthlyRequestPreview } from '@/components/monthly/MonthlyRequestPreview';
+import { loadMonthRequests, type RequestSponsor } from '@/lib/monthly-requests-store';
+import type { RequestStatus } from '@/lib/monthly-requests';
 
 const FLOW = ['requested', 'confirmed', 'paid', 'declined', 'no_response', 'completed'];
 
@@ -141,7 +143,7 @@ function EventRow({ e, onChanged }: { e: UpcomingEvent; onChanged: () => void })
       </div>
 
       {sending && (monthlyRequest ? (
-        <MonthlyRequestDialog open onOpenChange={(o) => { if (!o) { setSending(false); onChanged(); } }} sponsors={[e.item.monthlySponsor!]} month={`${e.date.slice(0, 7)}-01`} />
+        <UpcomingMonthlyRequest sponsorId={e.item.monthlySponsor!.id} month={`${e.date.slice(0, 7)}-01`} onClose={() => { setSending(false); onChanged(); }} />
       ) : (
         <SponsorWishDialog
           sponsor={wishTarget(e).sponsor}
@@ -224,4 +226,17 @@ function Empty({ text, icon }: { text: string; icon?: boolean }) {
       <p className="text-sm text-muted-foreground">{text}</p>
     </Card>
   );
+}
+
+/** A monthly sponsor's donation day: this month's sponsorship request, in the request preview. */
+function UpcomingMonthlyRequest({ sponsorId, month, onClose }: { sponsorId: string; month: string; onClose: () => void }) {
+  const [row, setRow] = useState<RequestStatus<RequestSponsor> | null>(null);
+  useEffect(() => {
+    loadMonthRequests(month).then(({ rows }) => {
+      const r = rows.find((x) => x.sponsor.id === sponsorId);
+      if (r) setRow(r); else { toast.error('This monthly sponsor is not active.'); onClose(); }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sponsorId, month]);
+  return <MonthlyRequestPreview row={row} month={month} open onOpenChange={(o) => { if (!o) onClose(); }} />;
 }

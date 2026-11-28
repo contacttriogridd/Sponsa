@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { AMOUNT_NOT_SET, amountLabel, dropMissingAmounts, hasAmount, parseOptionalAmount } from '@/lib/amount';
-import { DEFAULT_REQUEST_EN, DEFAULT_REQUEST_TA, buildRequestMessage } from '@/lib/monthly-request';
+import { buildRequestMessage } from '@/lib/monthly-request';
 import { renderTemplate } from '@/lib/templates';
 import { DEFAULT_ORGANIZATION_NAMES as ORG } from '@/lib/organization';
 import { buildReminderItems, type ReminderSources } from '@/lib/today-reminders';
@@ -24,16 +24,19 @@ test('optional amount: NULL is "Amount not set", never ₹0', () => {
   assert.match(parseOptionalAmount('abc').error!, /greater than 0/);
 });
 
+// The Phase 2 texts: an admin-edited template using the older placeholders still fills correctly.
+const LEGACY = { en: 'Vanakkam {{sponsor_name}}, greetings from {{organization_name}}. Your monthly Annadhanam sponsorship for {{month}} is due on {{sponsor_date}}. Amount: ₹{{amount}}. UPI: {{upi_id}}. Thank you for feeding the hungry with us. – {{organization_name}}, {{contact_number}}', ta: 'வணக்கம் {{sponsor_name}} அவர்களே, {{organization_name}} சார்பாக அன்பான வணக்கங்கள். {{month}} மாதத்திற்கான உங்கள் மாதாந்திர அன்னதான நன்கொடை {{sponsor_date}} அன்று செலுத்த வேண்டியது. தொகை: ₹{{amount}}. UPI: {{upi_id}}. பசித்தவர்களுக்கு உணவளிக்கும் எங்கள் சேவையில் இணைந்திருப்பதற்கு நன்றி. – {{organization_name}}, {{contact_number}}' };
+
 test('a template with no amount leaves the amount sentence out — no "₹", "₹null" or "₹undefined"', () => {
   const pay = { upi_id: 'vptrust@upi', bank_details: '', contact_number: '96295 22777' };
   const s = { name: 'Sudhan', monthly_amount: null, payment_day: 5 };
-  const en = buildRequestMessage({ ta: DEFAULT_REQUEST_TA, en: DEFAULT_REQUEST_EN }, s, '2026-12-01', 'en', ORG, pay);
+  const en = buildRequestMessage(LEGACY, s, '2026-12-01', 'en', ORG, pay);
   assert.equal(en, 'Vanakkam Sudhan, greetings from VP TRUST. Your monthly Annadhanam sponsorship for December 2026 is due on 5 Dec 2026. UPI: vptrust@upi. Thank you for feeding the hungry with us. – VP TRUST, 96295 22777');
-  const ta = buildRequestMessage({ ta: DEFAULT_REQUEST_TA, en: DEFAULT_REQUEST_EN }, s, '2026-12-01', 'ta', ORG, pay);
+  const ta = buildRequestMessage(LEGACY, s, '2026-12-01', 'ta', ORG, pay);
   assert.ok(!ta.includes('தொகை') && !ta.includes('₹'), ta);
   for (const text of [en, ta]) assert.ok(!/₹\s*(null|undefined|0)?[.\s]|\{\{/.test(text), text);
   // With an amount, nothing is dropped.
-  assert.ok(buildRequestMessage({ ta: '', en: '' }, { ...s, monthly_amount: 1000 }, '2026-12-01', 'en', ORG, pay).includes('Amount: ₹1,000.'));
+  assert.ok(buildRequestMessage(LEGACY, { ...s, monthly_amount: 1000 }, '2026-12-01', 'en', ORG, pay).includes('Amount: ₹1,000.'));
   // A line that is only the amount goes away; other lines stay.
   assert.equal(dropMissingAmounts('Dear {{name}},\nAmount: ₹{{amount}}\nThank you', { amount: '' }), 'Dear {{name}},\nThank you');
   // Star-day templates: {{monthly_amount}} given as empty drops its sentence; in a preview (not given) it stays.

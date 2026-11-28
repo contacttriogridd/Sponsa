@@ -24,7 +24,6 @@ import { MoreVertical } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { RecordDonationDialog, type DonationPreset } from '@/components/shared/RecordDonationDialog';
-import { MonthlyRequestDialog } from '@/components/monthly/MonthlyRequestDialog';
 import { Send as SendIcon } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
@@ -44,6 +43,9 @@ import { relationshipLabel } from '@/lib/festival';
 import { PhoneLink } from '@/components/shared/PhoneLink';
 import { buildCallLink, displayPhone } from '@/lib/phone';
 import { AMOUNT_NOT_SET, AMOUNT_NOT_SET_EN, amountLabel } from '@/lib/amount';
+import { MonthlyRequestPreview } from '@/components/monthly/MonthlyRequestPreview';
+import { loadMonthRequests, type RequestSponsor } from '@/lib/monthly-requests-store';
+import { monthStart, type RequestStatus } from '@/lib/monthly-requests';
 
 type Row = EventSponsorRow;
 
@@ -67,7 +69,13 @@ export default function MonthlySponsorsPage() {
   const [monthDonations, setMonthDonations] = useState<Donation[]>([]);
   const [recordFor, setRecordFor] = useState<DonationPreset | null>(null);
   const [deletingSponsor, setDeletingSponsor] = useState<Row | null>(null);
-  const [requesting, setRequesting] = useState<Row[] | null>(null);
+  const [requesting, setRequesting] = useState<RequestStatus<RequestSponsor> | null>(null);
+  /** Opens this month's request for one sponsor (only active sponsors get one). */
+  async function openRequest(s: Row) {
+    const { rows } = await loadMonthRequests(monthStart(todayIst()));
+    const row = rows.find((r) => r.sponsor.id === s.id);
+    if (row) setRequesting(row); else toast.error(`${s.name} is not active, so no monthly request is sent.`);
+  }
   const { appUser } = useAuth();
   const isAdmin = appUser?.role === 'admin';
 
@@ -172,10 +180,9 @@ export default function MonthlySponsorsPage() {
             <Link href="/monthly-sponsors/star-calendar">
               <Button variant="outline"><CalendarDays className="h-4 w-4 mr-2" />Star Calendar</Button>
             </Link>
-            <Button variant="outline" disabled={notReady} title="Send the Monthly Sponsorship Request to everyone who has not paid this month"
-              onClick={() => setRequesting(sponsors.filter((s) => s.status === 'active' && !isPaid(s.id) && (!s.start_date || s.start_date.slice(0, 7) <= month.slice(0, 7))))}>
-              <SendIcon className="h-4 w-4 mr-2" />Payment requests
-            </Button>
+            <Link href="/monthly-sponsors/requests" title="This month's Monthly Sponsorship Requests (sent on the 1st–3rd)">
+              <Button variant="outline" disabled={notReady}><SendIcon className="h-4 w-4 mr-2" />Monthly requests</Button>
+            </Link>
             <Button variant="outline" onClick={() => setRecordFor({ sponsorType: 'monthly', category: 'Monthly', occasionDate: month })} disabled={notReady}>
               <IndianRupee className="h-4 w-4 mr-2" />Record Donation
             </Button>
@@ -273,7 +280,7 @@ export default function MonthlySponsorsPage() {
                               )}
                             </div>
                             <div className="text-sm text-muted-foreground mt-0.5">
-                              {s.star != null ? astroLabel(STARS[s.star]) : sponsorEvents.length ? 'Monthly events only' : 'Star not set'}
+                              {s.star != null ? astroLabel(STARS[s.star]) : sponsorEvents.length ? 'Star: —' : 'Star / event: —'}
                               {raasi != null && ` · ${astroLabel(RAASIS[raasi])}`}
                             </div>
                             <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-3">
@@ -329,7 +336,7 @@ export default function MonthlySponsorsPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => setRecordFor({ sponsorType: 'monthly', sponsorId: s.id, sponsorName: s.name, category: 'Monthly', occasionDate: month })}>Record Donation</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setRequesting([s])}>Send payment request</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openRequest(s)}>Send monthly request</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => { setEditing(s); setShowForm(true); }}>Edit</DropdownMenuItem>
                               {s.status === 'active'
                                 ? <DropdownMenuItem onClick={() => setStatus(s, 'stopped')}>Mark Inactive</DropdownMenuItem>
@@ -380,7 +387,7 @@ export default function MonthlySponsorsPage() {
           onSaved={() => loadPayments()}
         />
 
-        <MonthlyRequestDialog open={!!requesting} onOpenChange={(o) => !o && setRequesting(null)} sponsors={requesting || []} month={month} />
+        <MonthlyRequestPreview row={requesting} month={monthStart(todayIst())} open={!!requesting} onOpenChange={(o) => !o && setRequesting(null)} />
 
         <RecordDonationDialog open={!!recordFor} onOpenChange={(o) => !o && setRecordFor(null)} preset={recordFor} onSaved={() => loadPayments()} />
 

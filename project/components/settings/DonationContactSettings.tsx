@@ -22,7 +22,7 @@ export function DonationContactSettings() {
   const { appUser } = useAuth();
   const isAdmin = appUser?.role === 'admin';
   const [orgId, setOrgId] = useState<string | null>(null);
-  const [form, setForm] = useState({ ack_name: '', ack_whatsapp: '', ack_email: '', upi_id: '', bank_details: '' });
+  const [form, setForm] = useState({ ack_name: '', ack_whatsapp: '', ack_email: '', payment_details: '' });
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -31,7 +31,7 @@ export function DonationContactSettings() {
       if (!data) return;
       const r = ackRecipientFrom(data);
       setOrgId(data.id);
-      setForm({ ack_name: r.name, ack_whatsapp: r.whatsapp, ack_email: r.email, upi_id: data.upi_id || '', bank_details: data.bank_details || '' });
+      setForm({ ack_name: r.name, ack_whatsapp: r.whatsapp, ack_email: r.email, payment_details: data.payment_details || '' });
     });
   }, []);
 
@@ -45,10 +45,10 @@ export function DonationContactSettings() {
     setBusy(true);
     const { error } = await supabase.from('organization_settings').update({
       ack_name: form.ack_name.trim() || 'Udhaya Sir', ack_whatsapp: number, ack_email: form.ack_email.trim() || null,
-      upi_id: form.upi_id.trim() || null, bank_details: form.bank_details.trim() || null,
+      payment_details: form.payment_details.trim() || null,
     }).eq('id', orgId);
     setBusy(false);
-    if (error) { setStatus({ ok: false, text: error.code === 'PGRST204' ? 'These settings need database migration 00028 first.' : 'Unable to save. Please try again.' }); return; }
+    if (error) { setStatus({ ok: false, text: error.code === 'PGRST204' ? 'These settings need database migrations 00028 and 00031 first.' : 'Unable to save. Please try again.' }); return; }
     clearAckContext(); clearWishContext();
     setStatus({ ok: true, text: 'Saved.' });
   }
@@ -57,7 +57,7 @@ export function DonationContactSettings() {
     <Card className="p-5 space-y-4">
       <div>
         <h2 className="font-semibold">Donation acknowledgment & payment details</h2>
-        <p className="text-sm text-muted-foreground mt-1">Every recorded donation sends an acknowledgment to this person. UPI, bank and contact details fill the Monthly Sponsorship Request.</p>
+        <p className="text-sm text-muted-foreground mt-1">Every recorded donation sends an acknowledgment to this person. The payment details fill {'{{payment_details}}'} in the Monthly Sponsorship Request; when empty, that line is left out.</p>
       </div>
       <div className="grid sm:grid-cols-3 gap-4">
         <div className="space-y-1.5">
@@ -72,14 +72,10 @@ export function DonationContactSettings() {
           <Label htmlFor="ack-email">Email (optional)</Label>
           <Input id="ack-email" type="email" value={form.ack_email} onChange={(e) => set('ack_email', e.target.value)} disabled={!isAdmin} placeholder="name@example.com" />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="upi">UPI ID</Label>
-          <Input id="upi" value={form.upi_id} onChange={(e) => set('upi_id', e.target.value)} disabled={!isAdmin} placeholder="vptrust@upi" />
-        </div>
-        <p className="sm:col-span-2 self-end text-xs text-muted-foreground">{'{{contact_number}}'} is the organization phone in Organization Details.</p>
         <div className="space-y-1.5 sm:col-span-3">
-          <Label htmlFor="bank">Bank details</Label>
-          <Textarea id="bank" rows={2} value={form.bank_details} onChange={(e) => set('bank_details', e.target.value)} disabled={!isAdmin} placeholder="A/c name, A/c no, IFSC, bank & branch" />
+          <Label htmlFor="payment-details">Donation payment details</Label>
+          <Textarea id="payment-details" rows={4} value={form.payment_details} onChange={(e) => set('payment_details', e.target.value)} disabled={!isAdmin}
+            placeholder={'UPI: vptrust@upi\nA/c name: VP TRUST · A/c no: 1234567890 · IFSC: ABCD0123456\nor a payment link'} />
         </div>
       </div>
       {status && <p className={status.ok ? 'text-sm text-success' : 'text-sm text-destructive'}>{status.text}</p>}

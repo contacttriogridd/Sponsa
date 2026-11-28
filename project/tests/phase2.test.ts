@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { ACK_TEMPLATE, ackRecipientFrom, buildAckMessage } from '@/lib/acknowledgment';
 import { DEFAULT_REQUEST_EN, DEFAULT_REQUEST_TA, buildRequestMessage, requestDueDate, requestValues } from '@/lib/monthly-request';
+import { BOTH_DIVIDER } from '@/lib/thank-you';
 import { occasionEvent, pickYearlyDate } from '@/lib/recurrence';
 import { DEFAULT_OCCASION_TYPES, draftToRow, missingYears, newDraft, validateDraft } from '@/lib/occasion-draft';
 import { boardCategoryOf } from '@/lib/dates-board';
@@ -29,28 +30,30 @@ test('acknowledgment recipient defaults to Udhaya Sir', () => {
   assert.equal(ackRecipientFrom({ admin_name: 'UDHAYA KUMAR', admin_whatsapp_number: '919629522777' }).name, 'UDHAYA KUMAR');
 });
 
-test('monthly request: due date, Tamil month, amount and organization name per language', () => {
+// The Phase 2 texts: an admin-edited template using the older placeholders still fills correctly.
+const LEGACY = { en: 'Vanakkam {{sponsor_name}}, greetings from {{organization_name}}. Your monthly Annadhanam sponsorship for {{month}} is due on {{sponsor_date}}. Amount: ₹{{amount}}. UPI: {{upi_id}}. Thank you for feeding the hungry with us. – {{organization_name}}, {{contact_number}}', ta: 'வணக்கம் {{sponsor_name}} அவர்களே, {{organization_name}} சார்பாக அன்பான வணக்கங்கள். {{month}} மாதத்திற்கான உங்கள் மாதாந்திர அன்னதான நன்கொடை {{sponsor_date}} அன்று செலுத்த வேண்டியது. தொகை: ₹{{amount}}. UPI: {{upi_id}}. பசித்தவர்களுக்கு உணவளிக்கும் எங்கள் சேவையில் இணைந்திருப்பதற்கு நன்றி. – {{organization_name}}, {{contact_number}}' };
+
+test('monthly request (older template): due date, Tamil month, amount and organization name per language', () => {
   assert.equal(requestDueDate({ payment_day: 31 }, '2027-02-01'), '2027-02-28');
   assert.equal(requestDueDate({ payment_day: null }, '2026-12-01'), '2026-12-01');
   const pay = { upi_id: 'vptrust@upi', bank_details: '', contact_number: '96295 22777' };
   const s = { name: 'Sudhan', monthly_amount: 1000, payment_day: 5 };
-  assert.deepEqual(requestValues(s, '2026-12-01', 'en', ORG, pay), {
-    sponsor_name: 'Sudhan', organization_name: 'VP TRUST', month: 'December 2026', sponsor_date: '5 Dec 2026',
-    amount: '1,000', upi_id: 'vptrust@upi', bank_details: '', contact_number: '96295 22777',
-  });
+  const v = requestValues(s, '2026-12-01', 'en', ORG, pay);
+  assert.deepEqual([v.organization_name, v.month, v.sponsor_date, v.amount, v.upi_id], ['VP TRUST', 'December 2026', '5 Dec 2026', '₹1,000', 'vptrust@upi']);
   assert.equal(requestValues(s, '2026-12-01', 'ta', ORG, pay).month, 'டிசம்பர் 2026');
   assert.equal(requestValues(s, '2026-12-01', 'ta', ORG, pay).organization_name, 'வள்ளலார் பசியாற்றும் அறக்கட்டளை');
-  const en = buildRequestMessage({ ta: DEFAULT_REQUEST_TA, en: DEFAULT_REQUEST_EN }, s, '2026-12-01', 'en', ORG, pay);
+  const en = buildRequestMessage(LEGACY, s, '2026-12-01', 'en', ORG, pay);
   assert.equal(en, 'Vanakkam Sudhan, greetings from VP TRUST. Your monthly Annadhanam sponsorship for December 2026 is due on 5 Dec 2026. Amount: ₹1,000. UPI: vptrust@upi. Thank you for feeding the hungry with us. – VP TRUST, 96295 22777');
-  const both = buildRequestMessage({ ta: '', en: '' }, s, '2026-12-01', 'both', ORG, pay);
+  const both = buildRequestMessage(LEGACY, s, '2026-12-01', 'both', ORG, pay);
   assert.ok(both.startsWith('வணக்கம் Sudhan அவர்களே'));
-  assert.ok(both.includes('\n\nVanakkam Sudhan'));
+  assert.ok(both.includes(['', '', BOTH_DIVIDER, '', 'Vanakkam Sudhan'].join(String.fromCharCode(10))));
   assert.ok(!/\{\{/.test(both));
 });
 
-test('the migration seeds the same request templates the app falls back to', () => {
-  assert.ok(sql.includes(DEFAULT_REQUEST_EN));
-  assert.ok(sql.includes(DEFAULT_REQUEST_TA));
+test('migration 00031 seeds the request texts the app falls back to', () => {
+  const sql31 = readFileSync(new URL('../supabase/migrations/20261128120000_00031_monthly_sponsorship_requests.sql', import.meta.url), 'utf8');
+  assert.ok(sql31.includes(DEFAULT_REQUEST_EN));
+  assert.ok(sql31.includes(DEFAULT_REQUEST_TA));
 });
 
 test('sponsorship statuses: the app and the migration agree', () => {

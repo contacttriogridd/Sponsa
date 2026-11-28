@@ -46,7 +46,7 @@ export function SponsorEventsPicker({ value, onChange, monthlyAmount }: Props) {
   return (
     <div className="space-y-2.5 rounded-xl border border-border p-3">
       <div>
-        <Label>Monthly Events (மாதாந்திர விசேஷ நாட்கள்)</Label>
+        <Label>Monthly Events (மாதாந்திர விசேஷ நாட்கள்) <span className="text-muted-foreground font-normal">— optional</span></Label>
         <p className="text-xs text-muted-foreground mt-0.5">Sponsor will get a wish message on each selected event day.</p>
       </div>
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Monthly events">

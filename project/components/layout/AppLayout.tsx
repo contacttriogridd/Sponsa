@@ -23,6 +23,7 @@ import { MessageConfirmHost } from '@/components/shared/MessageConfirmHost';
 import { loadReminderData, useLiveRefresh } from '@/lib/today-reminders-store';
 import { useNumbersToFixCount } from '@/lib/numbers-to-fix-store';
 import { PhoneOff } from 'lucide-react';
+import { useMonthlyRequestCounts } from '@/lib/monthly-requests-store';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard, Users, Calendar, Bell, HandHeart, Gift, BarChart3, Settings, Star, Sparkles,
@@ -78,6 +79,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   useLiveRefresh(refreshTodayCount);
   // Admins: invalid saved phone numbers, until all are fixed.
   const numbersToFix = useNumbersToFixCount(appUser?.role === 'admin');
+  // 1st–3rd of the month: this month's sponsorship requests, on the Monthly Sponsors item.
+  const { counts: requestCounts } = useMonthlyRequestCounts(!!appUser);
 
   if (loading || !appUser) {
     return (
@@ -123,6 +126,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             >
               <Icon className="h-4 w-4 shrink-0" />
               {item.label}
+              {item.href === '/monthly-sponsors' && requestCounts && (
+                <span className={cn('ml-auto px-1.5 h-5 rounded-full text-[10px] flex items-center whitespace-nowrap', active ? 'bg-primary-foreground/20' : requestCounts.pending ? 'bg-warning/20 text-warning-foreground' : 'bg-success/15 text-success')}
+                  title="This month's sponsorship requests">
+                  Pending: {requestCounts.pending} · Sent: {requestCounts.sent}
+                </span>
+              )}
               {item.href === '/dashboard' && todayCount > 0 && (
                 <span className="ml-auto min-w-5 h-5 px-1 rounded-full bg-destructive text-white text-xs flex items-center justify-center">{todayCount}</span>
               )}

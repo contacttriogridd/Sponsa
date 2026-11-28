@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ThankYouNoteEditor } from '@/components/settings/ThankYouNoteEditor';
 import { EventWishTemplatesEditor } from '@/components/settings/EventWishTemplatesEditor';
+import { MonthlyRequestTemplateEditor } from '@/components/settings/MonthlyRequestTemplateEditor';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,7 +77,7 @@ ${ORGANIZATION_SIGN_OFF}`, is_approved: false, language: '' });
     ? body.replace(/\{\{\s*organization_name\s*\}\}/g, organizationNames.org_name_en).replace(/\{\{\s*organization_name_ta\s*\}\}/g, organizationNames.org_name_ta)
     : renderTemplate(body, {}, organizationNames));
 
-  const VARIABLES = ['{{sponsor_name}}', '{{person_name}}', '{{occasion}}', '{{organization_name}}', '{{date}}', '{{star_name}}', '{{raasi_name}}', '{{star_date}}', '{{monthly_amount}}', '{{star_tamil}}', '{{star_english}}', '{{star_day_date}}', '{{star_day_weekday}}', '{{days_left}}', '{{organization_name_tamil}}', '{{contact_phone}}', '{{contact_name}}', '{{contact_title_en}}', '{{contact_title_ta}}', '{{relation_en}}', '{{relation_ta}}', '{{event_date}}', '{{donation_line_en}}', '{{donation_line_ta}}', '{{organization_name_ta}}', '{{month}}', '{{sponsor_date}}', '{{amount}}', '{{upi_id}}', '{{bank_details}}', '{{contact_number}}'];
+  const VARIABLES = ['{{sponsor_name}}', '{{person_name}}', '{{occasion}}', '{{organization_name}}', '{{date}}', '{{star_name}}', '{{raasi_name}}', '{{star_date}}', '{{monthly_amount}}', '{{star_tamil}}', '{{star_english}}', '{{star_day_date}}', '{{star_day_weekday}}', '{{days_left}}', '{{organization_name_tamil}}', '{{contact_phone}}', '{{contact_name}}', '{{contact_title_en}}', '{{contact_title_ta}}', '{{relation_en}}', '{{relation_ta}}', '{{event_date}}', '{{donation_line_en}}', '{{donation_line_ta}}', '{{organization_name_ta}}', '{{amount}}', '{{month_name}}', '{{payment_details}}'];
 
   return (
     <AppLayout>
@@ -96,6 +97,7 @@ ${ORGANIZATION_SIGN_OFF}`, is_approved: false, language: '' });
 
         <ThankYouNoteEditor />
         <EventWishTemplatesEditor />
+        <MonthlyRequestTemplateEditor />
 
         <div className="p-3 rounded-lg bg-muted text-sm">
           <span className="font-medium">Available variables: </span>
@@ -175,7 +177,7 @@ ${ORGANIZATION_SIGN_OFF}`, is_approved: false, language: '' });
                         <SelectItem value="en">English</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">Placeholders: {'{{sponsor_name}} {{organization_name}} {{month}} {{sponsor_date}} {{amount}} {{upi_id}} {{bank_details}} {{contact_number}}'}. Sent from Monthly Sponsors → Payment requests.</p>
+                    <p className="text-xs text-muted-foreground">Placeholders: {'{{sponsor_name}} {{amount}} {{month_name}} {{organization_name}} {{payment_details}}'}. Easier to edit in the Monthly Sponsorship Request section above. Sent from Monthly Sponsors → Monthly requests.</p>
                   </div>
                 )}
                 <div className="space-y-1.5 sm:col-span-2">

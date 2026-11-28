@@ -81,8 +81,7 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
 
   async function save() {
     if (!form.name.trim()) { setError('Name is required.'); return; }
-    // A star day or at least one monthly event: otherwise the sponsor never gets a wish.
-    if (form.star == null && events.length === 0) { setError('Choose a Natchathiram (star) or at least one Monthly Event.'); return; }
+    // Star and events are optional: a sponsor without them simply gets no star-day or event wishes (add them later via Edit).
     if (events.some((e) => e.amount.trim() !== '' && !(Number(e.amount) >= 0))) { setError('Event amounts must be numbers.'); return; }
     const phone = phoneForSave(form.phone);
     if (phone.error) { setError(`Phone / WhatsApp: ${phone.error}.`); return; }
@@ -159,7 +158,7 @@ export function MonthlySponsorForm({ sponsor, onSaved, onCancel }: MonthlySponso
           <AstroCombobox id="ms-raasi" items={RAASIS} all={RAASIS} value={form.raasi} onChange={(v) => set('raasi', v)} placeholder="Select Raasi" />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="ms-star">Natchathiram (நட்சத்திரம்){events.length === 0 && <span className="text-muted-foreground font-normal"> — or pick a Monthly Event below</span>}</Label>
+          <Label htmlFor="ms-star">Natchathiram (நட்சத்திரம்) <span className="text-muted-foreground font-normal">— optional</span></Label>
           <AstroCombobox
             id="ms-star"
             items={starOptions}
